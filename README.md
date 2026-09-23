@@ -1,143 +1,323 @@
-<img width="1299" height="424" alt="cd (1)" src="https://github.com/user-attachments/assets/b25fff4d-043d-4f38-9985-f832ae0d0f6e" />
+# Cheating Daddy
 
-## Recall.ai - API for desktop recording
+**AI-ассистент для технических разговоров, собеседований и подготовки к ним.**
 
-If you’re looking for a hosted desktop recording API, consider checking out [Recall.ai](https://www.recall.ai/product/desktop-recording-sdk/?utm_source=github&utm_medium=sponsorship&utm_campaign=sohzm-cheating-daddy), an API that records Zoom, Google Meet, Microsoft Teams, in-person meetings, and more.
+Приложение собирает вопросы из речи, помогает разбирать код и схемы, учитывает материалы вакансии и сохраняет ответы для повторения. Главное — вы управляете темпом: новый вопрос не переключает экран, пока вы читаете предыдущий ответ.
 
-This project is sponsored by Recall.ai.
+Это расширенный форк [sohzm/cheating-daddy](https://github.com/sohzm/cheating-daddy). Основной сценарий этой версии — работа с **OpenAI напрямую или моделями OpenAI через OpenRouter**. Именно в этих режимах доступны описанные ниже инструменты сессии, темы и восстановление.
 
----
+[Главные возможности](#главные-возможности) · [Быстрый старт](#быстрый-старт) · [Настройка AI](#настройка-ai) · [Горячие клавиши](#горячие-клавиши) · [Проверка перед звонком](docs/INTERVIEW_CHECKLIST_RU.md)
 
-> [!NOTE]  
-> Use latest MacOS and Windows version, older versions have limited support
+## Главные возможности
 
-> [!NOTE]  
-> During testing it wont answer if you ask something, you need to simulate interviewer asking question, which it will answer
+### 1. Ответы, которые можно спокойно дочитать
 
-A real-time AI assistant that provides contextual help during video calls, interviews, presentations, and meetings using screen capture and audio analysis.
+Новые ответы сохраняются в отдельных карточках и не переключают выбранный ответ. Прокрутка не сбрасывается при поступлении новых фрагментов.
 
-## Features
+- **«Только ответ»** скрывает служебные панели и освобождает место для чтения.
+- **A− / A+** меняют размер текста прямо во время сессии. Размер сохраняется, для изменения можно назначить горячие клавиши.
+- **Пауза** останавливает обработку нового аудио, но оставляет доступными письменные вопросы и скриншоты.
+- Ответ на письменное уточнение приходит в ту карточку, из которой его отправили, даже если вы уже перешли к другой.
+- Стрелки позволяют вернуться к предыдущим ответам и прочитать новые в удобный момент.
 
-- **Live AI Assistance**: Real-time help powered by Google Gemini 2.0 Flash Live
-- **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
-- **Multiple Profiles**: Interview, Sales Call, Business Meeting, Presentation, Negotiation
-- **Transparent Overlay**: Always-on-top window that can be positioned anywhere
-- **Click-through Mode**: Make window transparent to clicks when needed
-- **Cross-platform**: Works on macOS, Windows, and Linux (kinda, dont use, just for testing rn)
+Например: вы читаете объяснение каналов Go, а собеседник уже спрашивает про Kafka. Приложение сохраняет новый вопрос, не забирая у вас текущий ответ.
 
-## Setup
+### 2. Вопросы из разговора с проверкой перед отправкой
 
-1. **Get a Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/apikey)
-2. **Install Dependencies**: `npm install`
-3. **Run the App**: `npm start`
+Связанные реплики объединяются в редактируемый вопрос:
 
-## Usage
+> «Расскажи про индексы…»
+>
+> «…и почему PostgreSQL иногда их не использует?»
 
-1. Enter your Gemini API key in the main window
-2. Choose your profile and language in settings
-3. Click "Start Session" to begin
-4. Position the window using keyboard shortcuts
-5. The AI will provide real-time assistance based on your screen and what interview asks
+Короткие подтверждения вроде «угу» и «понятно» отфильтровываются. Во вкладке **«Вопросы»** можно исправить формулировку, пропустить вопрос или нажать **«Ответить на вопрос»**. Генерация ответа начинается после подтверждения.
 
-## Keyboard Shortcuts
-
-- **Window Movement**: `Ctrl/Cmd + Arrow Keys` - Move window
-- **Click-through**: `Ctrl/Cmd + M` - Toggle mouse events
-- **Close/Back**: `Ctrl/Cmd + \` - Close window or go back
-- **Send Message**: `Enter` - Send text to AI
-
-## Audio Capture
-
-- **macOS**: [SystemAudioDump](https://github.com/Mohammed-Yasin-Mulla/Sound) for system audio
-- **Windows**: Loopback audio capture
-- **Linux**: Microphone input
-
-## Requirements
-
-- Electron-compatible OS (macOS, Windows, Linux)
-- Gemini API key
-- Screen recording permissions
-- Microphone/audio permissions
-
-## OpenAI / OpenRouter and reading during calls
-
-Start with `npm install` and `npm start`. On Home select **OpenRouter · OpenAI models** or **OpenAI**, enter that provider's API key, and keep the default response model or enter a compatible model ID. OpenRouter model IDs must start with `openai/`; the default is `openai/gpt-4o-mini`. Direct OpenAI defaults to `gpt-4o-mini`.
-
-Both hosted modes use Whisper for transcription and the selected chat model for answers. In OpenRouter mode screenshots first go through a separate low-cost OCR model. OpenRouter uses its own transcription endpoint and the same OpenRouter key; a separate OpenAI key is unnecessary. Direct OpenAI uses `whisper-1`. ChatGPT subscriptions do not include these API charges. Authentication, quota and stream errors are shown in the application, with no silent switch to another provider.
-
-- Recognized speech enters an editable question inbox. Approve a question to generate an answer. New topic cards do not move the answer you are reading or reset its scroll position.
-- Use the response arrows, **next · N waiting**, or **Cmd/Ctrl + [ / ]** to change answers.
-- **Pause / Resume** or **Cmd/Ctrl + P** stops new audio processing only. Text questions and Analyze Screen remain available; their answers are appended to the response card where you asked, without opening another card. Manual requests already in progress finish; queued audio is discarded. Audio during pause is discarded. Pausing does not revoke OS capture permissions or stop the OS recording indicator.
-- End the session to stop capture, cancel the hosted request, and discard pending work. Starting a new session clears conversational context.
-- Audio modes in Settings select system sound, microphone or both. System sound and microphone use separate speech buffers. Short silence is filtered locally; audio is resampled to mono 16 kHz before upload. Long speech is split at 20 seconds. This energy-based VAD is not speaker diarization or acoustic echo cancellation; headphones help when capturing both channels.
-
-Hosted audio is sent to the selected provider for transcription; text/context and manually captured screenshots are sent for responses. API keys are stored in the existing local `cheating-daddy-config/credentials.json`, outside the repository. Conversation text and screen analyses use the existing local history. On macOS this directory is `~/Library/Application Support/cheating-daddy-config`. Hosted processing does not persist raw audio unless the existing `DEBUG_AUDIO` option is enabled. Use History controls to delete saved sessions.
-
-Verification: `npm test` runs the Node test suite for streaming, ordered requests, cancellation, speech segmentation, pause and reading position. `npm run package` packages the Electron app. This JavaScript repository currently has no `typecheck` script; `npm run lint` is a placeholder.
-
-API references: [OpenRouter transcription](https://openrouter.ai/blog/tutorials/transcription-on-openrouter/), [OpenAI speech-to-text](https://developers.openai.com/api/docs/guides/speech-to-text).
-
-Analyze Screen captures a JPEG draft; **📎 Скриншот** and paste attach images up to 10 MB each. Hosted modes offer editable OCR or direct vision. OpenRouter OCR defaults to `google/gemini-2.5-flash-lite`; the selected answer model receives the reviewed text in OCR mode, or full images in vision mode. OCR can misread small text and does not preserve diagrams. Images are resized to at most 1920 pixels wide. Markdown tables have horizontal scrolling. [OCR model details](https://openrouter.ai/google/gemini-2.5-flash-lite).
-
-## Saved instruction sets
-
-Open **AI Customization → Новый набор**, enter a name and instructions, then choose **Сохранить и использовать**. The set marked ✓ is applied at the next session start, alongside the selected base profile. Switch to another set and save to activate it. Existing custom instructions migrate into **Мои инструкции** without changing their text. Sets are stored in the existing preferences file; active sessions retain their original prompt.
-
-Returning from a session cancels capture startup and clears the start guard, including when permission dialogs or cleanup fail. A late capture permission result cannot revive an ended session. The upstream update button and automatic update checks are disabled for this fork.
-
-### Manual answer cards and screenshot drafts
-
-Use **+ Новое окно ответа** to open an empty response card (navigate between cards with the arrows).
-Pasting or choosing a screenshot attaches a draft: add your task in the text field, then click **Отправить** or press Enter.
-**Убрать** removes the attachment. In hosted modes Analyze Screen captures a draft for review before sending.
-
-### Local macOS signing
-
-Packaged builds use the stable bundle ID `com.denis.cheatingdaddy`. To preserve macOS privacy identity across updates, package with the same signing certificate every time:
-
-```sh
-CD_SIGN_IDENTITY='<your Apple Development identity or certificate hash>' npm run package
+```mermaid
+flowchart LR
+    A[Речь собеседника] --> B[Распознавание]
+    B --> C[Объединение реплик]
+    C --> D[Проверка и правка вопроса]
+    D --> E[Ответ AI]
+    E --> F[Карточка темы и история]
 ```
 
-Use `security find-identity -v -p codesigning` to list available certificates. An unsigned build has a different identity.
-After moving from the old Electron identity, grant Screen & System Audio Recording to the new installed application once and fully quit/relaunch it.
-The app no longer requests screen access on launch; capture begins only when starting a session.
+Объединение использует временное окно и признаки темы. Если автоматика ошиблась, вопрос и его направление можно поправить вручную.
 
-### Profiles, history and persistence
+### 3. Короткий ответ сверху, подробности по запросу
 
-AI Customization has a profile list and a full-text editor, plus a separate tab for additional instructions.
-Create/edit/delete drafts, then click **Сохранить и использовать** to persist and select them for the next session.
-All six built-in profiles are editable; deleting every profile enables a mode using only additional instructions.
-Deleting the final additional-instruction set creates an empty set. Existing Java/Go or other user sets are preserved.
+Режим **«Ответ в 3 уровня»** задаёт модели структуру: краткая суть, объяснение и углублённый разбор с примером. Подробности можно раскрывать по мере необходимости.
 
-History supports deletion of one session or all sessions with confirmation. This does not remove credentials or preferences.
-Window dimensions are saved on resize/close and restored within the current display. Font size, theme and opacity are restored at startup.
-Settings writes are atomic; startup no longer wipes user data when the configuration version changes.
+Для продолжения разговора есть быстрые запросы:
 
-## Interview workspace (OpenAI / OpenRouter)
+| Действие         | Для чего                         |
+| ---------------- | -------------------------------- |
+| **Короче**       | Сжать ответ до главного          |
+| **Пример на Go** | Перейти от объяснения к примеру  |
+| **Почему?**      | Разобрать причину или механизм   |
+| **Сравнить**     | Попросить сопоставление подходов |
 
-See [the Russian pre-interview checklist](docs/INTERVIEW_CHECKLIST_RU.md) for setup, verification and limits.
+Код отображается с подсветкой синтаксиса, Markdown-таблицы — со структурой строк и столбцов. Широкую таблицу можно прокручивать горизонтально.
 
-Speech now enters an editable question inbox: nearby fragments are combined, acknowledgements filtered, and generation starts after approval. Answers have three levels with expandable details and follow-up shortcuts. Topics use a compact list with grouping, splitting and deletion.
+### 4. Уточнения внутри одной темы
 
-Preparation stores named vacancy packages with resume documents (PDF/DOCX/text), vacancy details and real project stories. The selected package is captured at session start; relevant excerpts accompany questions, with explicit instructions not to invent experience.
+«А если канал закрыт?» может продолжить карточку про каналы, а вопрос про Kafka — создать новую тему. В **«Настройках ответа»** доступны автоматическое определение темы, текущая тема и новая тема.
 
-Screenshots attach to the regular message composer, with OCR or full-image analysis. Paste, attachment and Analyze Screen prepare drafts. Add your task in the regular text field, choose OCR or vision, then send. OCR uses the configured inexpensive model; vision sends images to the selected response model. These explicit controls supersede the older automatic screenshot flow described above.
+В разделе **«Темы»** можно:
 
-Technical mode structures solutions and offers manual Go/Python/SQLite checks in restricted Docker containers. System design keeps editable requirements, load, API, storage, components and decisions, renders a simple diagram, and retains ten rollback versions. Local workspace data is saved in `interview-workspace.json` beside preferences; raw imported documents and screenshots are not persisted there.
+- открыть независимую карточку через **«+ Новая тема»**;
+- переключаться между темами;
+- объединить темы или отделить уточнение;
+- удалить ненужную тему.
 
-### Live session controls
+Карточки находятся внутри окна приложения. Удаление темы из текущего списка не заменяет удаление сохранённой сессии в History.
 
-Use the small **A− / A+** buttons to change answer text size during a session (12–48 px, saved immediately). Default shortcuts are **Cmd+Alt+Up/Down** on macOS and **Ctrl+Alt+Up/Down** elsewhere; customize them in Settings → Keyboard Shortcuts. Tools open in an opaque panel within the layout; The arrow collapses and reopens the selected panel. Submitted text clears immediately; failed requests restore it if no newer draft was typed.
+### 5. Подготовка под конкретную вакансию
 
-**Снять экран** (previously Analyze Screen) attaches a screen capture to the composer without sending it to AI. It requests a native Electron screenshot of the display containing the app, independently of the session video stream. Capture has a 10-second timeout (12 seconds in the renderer). Add a task and press Send to process the attachment.
+В **Preparation** создаются отдельные пакеты для разных вакансий. В пакет входят резюме, описание позиции, требования и реальные истории ваших проектов.
 
-Code blocks use the bundled Highlight.js engine and a stylesheet inside the answer component. User questions are shown at 14 px; redundant answer labels are hidden.
+Поддерживается импорт **PDF с текстовым слоем, DOCX, TXT и Markdown**. Извлечённый текст можно проверить и отредактировать. Для сканированного документа без текста используйте распознавание скриншотов.
 
-### Session reliability
+Приложение подбирает релевантные фрагменты материалов под вопрос. Инструкции просят модель опираться на факты из вашего опыта и обозначать пробелы, если сведений нет.
 
-Home offers a readiness check (real model completion and latency, native screenshot, six seconds of macOS system-audio level measurement, and microphone signal when selected). Only the synthetic text probe goes to the model. Answer-only mode hides tools and toggles with Cmd/Ctrl+Shift+F, configurable in Settings.
+**Сохраните и выберите пакет до начала сессии:** контекст фиксируется при её запуске. Ответы модели всё равно нужно проверять — наличие материалов не исключает выдуманных фактов.
 
-Hosted sessions save local recovery checkpoints each second and on normal window shutdown. Home can resume the original history with topic cards, text draft, attachment drafts and reading position. Failed or interrupted manual requests have an explicit retry in the same card; no automatic resubmission. Checkpoints are removed when a session ends or the user chooses to start over. See the Russian checklist for limits and privacy details.
+### 6. Скриншоты с вашим заданием
 
-History automatically derives an evidence-based, local review: repeated/clarified topics, answers requiring verification, and next-day exercises. This is a heuristic review of recorded questions and AI responses, not a judgment of the candidate's spoken performance.
+Вставьте изображение в поле сообщения, прикрепите файл кнопкой **«Скриншот»** или нажмите **«Снять экран»**. Затем добавьте текст задания и отправьте запрос. Само прикрепление не отправляет изображение AI.
+
+Можно приложить несколько скриншотов к одному вопросу и выбрать способ обработки:
+
+| Режим                  | Когда подходит                          | Что происходит                                                        |
+| ---------------------- | --------------------------------------- | --------------------------------------------------------------------- |
+| **Распознать текст**   | Текст задачи, код, сообщения об ошибках | В OpenRouter отдельная OCR-модель извлекает текст для основной модели |
+| **Анализ изображения** | Схемы, графики, расположение элементов  | Изображения получает модель с поддержкой vision                       |
+
+В OpenRouter для OCR используется отдельная модель, по умолчанию `google/gemini-2.5-flash-lite`. Основная модель затем работает с извлечённым текстом; распознанный текст показывается вместе с ответом. В прямом режиме OpenAI изображение передаётся основной модели целиком, поэтому ей нужна поддержка vision. Стоимость зависит от настроек и тарифов провайдера.
+
+**«Снять экран»** — новое название Analyze Screen. Кнопка делает снимок дисплея с окном приложения и добавляет его в черновик сообщения.
+
+### 7. Инструменты для кода и System design
+
+**Техническая задача** задаёт структуру ответа: что уточнить, идея, код, сложность, крайние случаи и объяснение решения. Для Go инструкции обращают внимание на блокировки, goroutine и отмену через `context`; для SQL — на смысл запроса и индексы.
+
+**Проверка кода** позволяет вручную запускать код и тесты в Docker:
+
+- **Go** — самодостаточный `package main`, стандартная библиотека, отдельное поле тестов.
+- **Python** — код и проверки со стандартной библиотекой.
+- **SQL** — выполнение в SQLite в памяти.
+
+Контейнер работает без сети, с ограничениями памяти, CPU и времени. AI не запускает код автоматически. Успешный запуск не доказывает корректность всех случаев: например, проверка Go не включает race detector, а SQLite не проверяет особенности PostgreSQL.
+
+**System design** хранит требования, нагрузку, API, хранилища, компоненты и принятые решения. Можно добавить новое ограничение, например multi-region, посмотреть изменения, отредактировать проект и вернуться к предыдущей версии. Приложение показывает простую схему компонентов и сохраняет до десяти предыдущих версий.
+
+## Надёжность и работа после сессии
+
+### Проверка готовности одной кнопкой
+
+На Home кнопка **«Проверить готовность»** проверяет:
+
+- доступ к выбранной модели и время реального ответа;
+- захват экрана;
+- поступление системного звука на macOS;
+- сигнал микрофона, если он выбран в настройках.
+
+Результат показывает конкретную проблему, например отсутствие аудиосигнала. Для проверки звука включите воспроизведение речи; при проверке микрофона произнесите фразу. Тишина сама по себе не означает неисправность.
+
+Снимок и аудио этой проверки не уходят провайдеру. Короткий текстовый запрос к модели оплачивается как обычный API-запрос. Проверка отражает состояние на момент запуска.
+
+### Восстановление после сбоя
+
+В режимах OpenAI/OpenRouter приложение сохраняет темы, черновик сообщения, вложения и положение чтения. После перезапуска Home предлагает **продолжить незавершённую сессию** или начать заново.
+
+При сетевой ошибке можно повторить конкретный запрос в прежней карточке. Приложение не отправляет незавершённые запросы повторно без вашего действия.
+
+Сохранение происходит раз в секунду и при обычном закрытии. При внезапном сбое последние изменения могут не успеть записаться. Повтор оборванного запроса может оплачиваться заново, если провайдер уже обработал первую отправку.
+
+### History и план повторения
+
+В **History** остаются вопросы и ответы сессий. Можно удалить одну историю или все сохранённые истории с подтверждением.
+
+После завершения сессии локальный разбор предлагает:
+
+- темы, по которым были повторные вопросы и уточнения;
+- ответы, которые стоит перепроверить;
+- упражнения и темы для повторения завтра.
+
+Разбор использует правила и сохранённую историю. Он не оценивает ваши устные ответы и не подтверждает правильность подсказок AI.
+
+## Настройка под себя
+
+### AI Customization
+
+Здесь два отдельных вида настроек:
+
+| Настройка                     | Назначение                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| **Профиль**                   | Полные инструкции для поведения AI: роль, стиль, формат и правила ответа                     |
+| **Дополнительные инструкции** | Ваши уточнения поверх выбранного профиля, например отвечать кратко и приводить примеры на Go |
+
+Профили и наборы инструкций можно создавать, просматривать целиком, редактировать и удалять. Кнопка **«Сохранить и использовать»** сохраняет изменения и выбирает набор для следующей сессии. Уже запущенная сессия сохраняет прежние инструкции.
+
+При первой настройке доступны шесть редактируемых профилей: **Job Interview, Sales Call, Business Meeting, Presentation, Negotiation и Exam Assistant**. Можно заменить их своими или удалить все профили и оставить только дополнительные инструкции.
+
+### Небольшие удобства
+
+- Настраиваемые горячие клавиши, в том числе для размера шрифта и режима «Только ответ».
+- Выбор языка распознавания речи в **Settings → Speech Language**.
+- Захват системного звука, микрофона или обоих источников.
+- Сохранение размера окна, темы оформления, прозрачности и размера текста.
+- Окно поверх других приложений, скрытие окна и режим пропуска кликов.
+- Сворачивание панели инструментов стрелкой.
+- Очистка поля ввода сразу после отправки. При ошибке запрос возвращается в пустое поле, не затирая новый черновик.
+- Встроенная справка **Help** с описанием функций и сочетаний клавиш.
+
+## Быстрый старт
+
+### Что понадобится
+
+- Node.js и npm для запуска из исходников либо готовая сборка приложения.
+- Ключ выбранного AI-провайдера и доступ к нужной модели.
+- Для облачных режимов — подключение к интернету.
+- Разрешения на захват экрана и нужного источника звука.
+- Docker — только если планируете запускать код и тесты.
+
+Основные изменения этого форка проверялись на macOS. В проекте есть код и сборочные настройки для Windows и Linux, но это не означает одинаковую поддержку всех функций. В частности, проверка системного звука перед сессией реализована для macOS.
+
+### Запуск из исходников
+
+В каталоге проекта выполните:
+
+```sh
+npm install
+npm start
+```
+
+Если у вас уже установлена macOS-сборка, откройте **Cheating Daddy.app** из Applications. Для проверки разрешений и сохранения настроек используйте одну и ту же копию приложения.
+
+### Первая сессия
+
+1. На **Home** выберите **OpenRouter · OpenAI models** или **OpenAI**, введите ключ и модель.
+2. В **Settings** выберите источник звука и язык распознавания. Для речи собеседника через программу звонка нужен системный звук, а не только микрофон.
+3. При необходимости заполните **Preparation** и выберите инструкции в **AI Customization**.
+4. Нажмите **«Проверить готовность»**, затем **Start Session**.
+5. Отправьте простой текстовый вопрос, например «Чем buffered channel отличается от unbuffered в Go?».
+6. Проверьте вопрос из аудио, поставьте сессию на паузу и отправьте письменное уточнение.
+7. Завершите сессию стрелкой назад и откройте её в **History**.
+
+Перед важным разговором пройдите [подробный чек-лист](docs/INTERVIEW_CHECKLIST_RU.md) в той же программе звонка и с теми же наушниками.
+
+## Настройка AI
+
+| Режим          | Ключ               | Модель ответа по умолчанию в коде | Распознавание речи                  |
+| -------------- | ------------------ | --------------------------------- | ----------------------------------- |
+| **OpenRouter** | OpenRouter API key | `openai/gpt-4o-mini`              | `openai/whisper-1` через OpenRouter |
+| **OpenAI**     | OpenAI API key     | `gpt-4o-mini`                     | `whisper-1` через OpenAI            |
+
+В режиме OpenRouter идентификатор модели ответа должен начинаться с `openai/`. Для распознавания используется тот же ключ OpenRouter — отдельный ключ OpenAI не нужен. Для анализа изображения целиком выбирайте модель с поддержкой vision.
+
+Это значения по умолчанию в приложении, а не гарантия доступности моделей для конкретного аккаунта. Ошибки доступа, баланса или генерации показываются в интерфейсе. Скрытого переключения на другого провайдера нет. Подписка ChatGPT не оплачивает использование API.
+
+В Home также остаются режимы **Gemini / Groq** и **Local AI**. У них другой путь обработки и прежний интерфейс сессии; описанные выше возможности OpenAI/OpenRouter нельзя считать полностью доступными в этих режимах.
+
+## Горячие клавиши
+
+Здесь приведены значения по умолчанию. Ваши сохранённые сочетания смотрите в **Settings → Keyboard Shortcuts** или **Help**.
+
+| Действие                         | macOS                 | Windows / Linux         |
+| -------------------------------- | --------------------- | ----------------------- |
+| Отправить текстовый вопрос       | `Enter`               | `Enter`                 |
+| Пауза / продолжение аудио        | `Cmd + P`             | `Ctrl + P`              |
+| Только ответ / вернуть настройки | `Cmd + Shift + F`     | `Ctrl + Shift + F`      |
+| Увеличить шрифт                  | `Cmd + Alt + ↑`       | `Ctrl + Alt + ↑`        |
+| Уменьшить шрифт                  | `Cmd + Alt + ↓`       | `Ctrl + Alt + ↓`        |
+| Предыдущий / следующий ответ     | `Cmd + [` / `Cmd + ]` | `Ctrl + [` / `Ctrl + ]` |
+| Прокрутить ответ                 | `Cmd + Shift + ↑ / ↓` | `Ctrl + Shift + ↑ / ↓`  |
+| Показать / скрыть окно           | `Cmd + \`             | `Ctrl + \`              |
+| Пропускать клики через окно      | `Cmd + M`             | `Ctrl + M`              |
+| Переместить окно                 | `Alt + стрелки`       | `Ctrl + стрелки`        |
+
+## Экран и звук на macOS
+
+Разрешения находятся в **System Settings → Privacy & Security**:
+
+- **Screen & System Audio Recording** — для захвата экрана и системного звука.
+- **Microphone** — если выбран микрофон или оба источника.
+
+После изменения разрешений полностью закройте приложение через `Cmd + Q` и откройте снова. Разрешение должно относиться именно к запускаемой копии приложения: dev-запуск Electron и установленная сборка могут иметь разные записи в настройках macOS.
+
+Пауза прекращает обработку нового аудио, но не завершает захват и не обязана убирать системный индикатор записи. Чтобы остановить захват, завершите сессию.
+
+При захвате обоих источников используются отдельные аудиобуферы. Это не распознавание личности говорящего и не эхоподавление; для такого режима удобнее наушники.
+
+## Запуск кода в Docker
+
+Запустите Docker и заранее загрузите образы:
+
+```sh
+docker pull golang:1.25-alpine
+docker pull python:3.13-alpine
+```
+
+В сессии откройте **Инструменты → Проверка кода → Проверить Docker**. Вставьте код и тесты, затем запустите проверку вручную.
+
+Ограничения контейнера: **512 МБ памяти, 1 CPU, 96 процессов и 45 секунд**, сеть отключена. Внешние зависимости Go не скачиваются. SQL выполняется в SQLite в памяти. Если Docker недоступен, приложение не запускает код на компьютере вместо контейнера.
+
+## Где хранятся данные
+
+Настройки и история находятся вне репозитория:
+
+| Платформа | Каталог                                               |
+| --------- | ----------------------------------------------------- |
+| macOS     | `~/Library/Application Support/cheating-daddy-config` |
+| Windows   | `~/AppData/Roaming/cheating-daddy-config`             |
+| Linux     | `~/.config/cheating-daddy-config`                     |
+
+В этом каталоге хранятся:
+
+- `credentials.json` — API-ключи в локальном JSON-файле, без шифрования средствами Keychain;
+- `preferences.json`, `config.json`, `keybinds.json` — настройки, профили и сочетания клавиш;
+- `interview-workspace.json` — извлечённый текст материалов подготовки и проект System design;
+- `history/` — сохранённые сессии;
+- `active-session.json` — состояние незавершённой сессии, включая черновики вложений, для восстановления.
+
+Облачные режимы отправляют выбранному провайдеру аудио для распознавания, текст запроса и контекст, а также изображения при их обработке. Локальное хранение истории не означает локальную обработку AI.
+
+Удаление историй в **History** не удаляет ключи, профили и материалы подготовки. Файл восстановления удаляется при завершении сессии или выборе начала заново.
+
+## Если что-то не работает
+
+| Симптом                              | Что проверить                                                                                       |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Модель не отвечает                   | Провайдер, ключ, идентификатор модели, баланс и текст ошибки. Запустите проверку готовности         |
+| Системный звук не поступает          | Воспроизводится ли речь, выбран ли нужный аудиорежим, выданы ли разрешения текущей копии приложения |
+| Снимок экрана не получается          | Разрешение на запись экрана. После его изменения полностью перезапустите приложение                 |
+| Разговор распознаётся, но ответа нет | Вопрос ждёт подтверждения во вкладке «Вопросы». Также проверьте паузу и ошибки API                  |
+| Новые инструкции не применились      | Нажмите «Сохранить и использовать» и начните новую сессию                                           |
+| OCR потерял связи на схеме           | Используйте «Анализ изображения» с моделью, поддерживающей vision                                   |
+| Кнопки перестали принимать клики     | Проверьте, не включён ли режим пропуска кликов через окно                                           |
+| Проверка кода не запускается         | Запущен ли Docker и загружены ли нужные образы                                                      |
+
+## Разработка и сборка
+
+Текущий интерфейс написан на **JavaScript и Lit**, приложение использует **Electron**, сборку выполняет **Electron Forge**. Планы перехода на React/TypeScript не означают, что текущая версия уже использует этот стек.
+
+```sh
+npm test         # автоматические тесты Node.js
+npm run package  # упакованное приложение в out/
+npm run make     # установочные артефакты для настроенной платформы
+```
+
+Настоящий линтер пока не настроен: `npm run lint` выводит сообщение-заглушку. Скрипта `typecheck` нет. Автотесты проверяют, в частности, потоки ответов, очереди, паузу, сохранение позиции чтения, восстановление и IPC. Они не заменяют проверку звука, разрешений и API в реальном звонке.
+
+На macOS сборки используют bundle ID `com.denis.cheatingdaddy`. Для сохранения идентичности приложения между обновлениями подписывайте их одним сертификатом:
+
+```sh
+security find-identity -v -p codesigning
+CD_SIGN_IDENTITY='<имя сертификата или его хеш>' npm run package
+```
+
+Правила работы с проектом — в [AGENTS.md](AGENTS.md), сценарии ручной проверки и технические ограничения — в [чек-листе](docs/INTERVIEW_CHECKLIST_RU.md).
+
+## Основа проекта и лицензия
+
+Форк основан на [Cheating Daddy](https://github.com/sohzm/cheating-daddy). Лицензия — [GPL-3.0](LICENSE).
