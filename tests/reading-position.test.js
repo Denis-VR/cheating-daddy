@@ -238,12 +238,12 @@ test('automatic topic routing preserves reading position and merge/split retain 
     const follow = a.beginInterviewRequest('А если канал закрыт?', 'auto');
     assert.equal(a._inlineRequests.get(follow.requestId).index, 0);
     a.currentResponseIndex = 1;
-    a.mergeTopic();
+    a.mergeTopic([0, 1]);
     assert.equal(a.topicMeta[1].hidden, true);
     a.updateCurrentResponse({ id: second.requestId, text: 'Kafka finished' });
     assert.match(a.responses[0], /Channel answer/);
     assert.match(a.responses[0], /Kafka finished/);
-    a.splitTopic();
+    a.splitTopic(follow.requestId);
     assert.equal(a.currentResponseIndex, 2);
     a.updateCurrentResponse({ id: follow.requestId, text: 'Closed channel answer' });
     assert.match(a.responses[2], /Closed channel answer/);
@@ -479,4 +479,85 @@ test('readiness prevents duplicate probes and unlocks session start after IPC fa
     assert.equal(panel.busy, false);
     assert.equal(owner._preflightBusy, false);
     assert.equal(panel.results[0].text, 'Capture unavailable');
+});
+
+test('quick followups work on pause in the current topic without modifying the composer', async () => {
+    const View = loadClass('src/components/views/AssistantView.js', 'AssistantView');
+    const calls = [];
+    const tools = {
+        busy: false,
+        async perform(fn) {
+            await fn();
+        },
+        async ask(text, options) {
+            calls.push({ text, ...options });
+        },
+    };
+    const view = Object.assign(Object.create(View.prototype), {
+        paused: true,
+        isAnalyzing: false,
+        currentResponseIndex: 2,
+        shadowRoot: { querySelector: () => tools },
+    });
+    await view.handleQuickFollowup('Почему?');
+    assert.deepEqual(calls, [{ text: 'Почему?', routing: 'current' }]);
+    assert.equal(view.isAnalyzing, false);
+    tools.ask = async () => {
+        throw Error('offline');
+    };
+    await assert.rejects(view.handleQuickFollowup('Короче'), /offline/);
+    assert.equal(view.isAnalyzing, false);
+});
+
+test('merge requires explicit selection, skips unrelated topics, and split moves only the chosen request', () => {
+    const a = app();
+    a.topicMeta = [];
+    a.addNewResponse('A');
+    a.addNewResponse('B');
+    a.addNewResponse('C');
+    a.currentResponseIndex = 2;
+    const first = a.beginManualRequest('first clarification');
+    const second = a.beginManualRequest('second clarification');
+    a.mergeTopic();
+    assert.equal(
+        a.topicMeta.some(t => t.hidden),
+        false
+    );
+    a.mergeTopic([0, 2]);
+    assert.equal(a.topicMeta[2].hidden, true);
+    assert.equal(!!a.topicMeta[1].hidden, false);
+    assert.equal(a.responses[1], 'B');
+    a.splitTopic(first.requestId);
+    assert.equal(a._inlineRequests.get(first.requestId).index, 3);
+    assert.equal(a._inlineRequests.get(second.requestId).index, 0);
+});
+
+test('quick action edits persist full prompts, preserve old actions on failure, and allow deleting all', async () => {
+    let written;
+    const View = loadClass('src/components/views/AssistantView.js', 'AssistantView', {
+        window: {
+            cheatingDaddy: {
+                storage: {
+                    updatePreference: async (key, value) => {
+                        written = { key, value };
+                        return { success: true };
+                    },
+                },
+            },
+        },
+    });
+    const view = Object.assign(Object.create(View.prototype), {
+        actionDraft: [{ label: ' Go ', prompt: ' Explain a goroutine leak ' }],
+        quickActions: [],
+    });
+    await view.saveQuickActions();
+    assert.equal(written.key, 'quickActions');
+    assert.equal(written.value[0].prompt, 'Explain a goroutine leak');
+    assert.equal(view.quickActions[0].label, 'Go');
+    view.actionDraft = [{ label: '', prompt: 'x' }];
+    await view.saveQuickActions();
+    assert.equal(view.quickActions[0].label, 'Go');
+    view.actionDraft = [];
+    await view.saveQuickActions();
+    assert.equal(view.quickActions.length, 0);
 });

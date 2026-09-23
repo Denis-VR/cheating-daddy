@@ -176,6 +176,9 @@ export class CustomizeView extends LitElement {
     ];
 
     static properties = {
+        showInScreenSharing: { state: true },
+        sharingBusy: { state: true },
+        sharingError: { state: true },
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
         selectedImageQuality: { type: String },
@@ -197,6 +200,9 @@ export class CustomizeView extends LitElement {
 
     constructor() {
         super();
+        this.showInScreenSharing = false;
+        this.sharingBusy = false;
+        this.sharingError = '';
         this.selectedProfile = 'interview';
         this.selectedLanguage = 'en-US';
         this.selectedImageQuality = 'medium';
@@ -226,6 +232,7 @@ export class CustomizeView extends LitElement {
     async _loadFromStorage() {
         try {
             const [prefs, keybinds] = await Promise.all([cheatingDaddy.storage.getPreferences(), cheatingDaddy.storage.getKeybinds()]);
+            this.showInScreenSharing = (await cheatingDaddy.storage.getConfig()).showInScreenSharing === true;
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
@@ -365,6 +372,22 @@ export class CustomizeView extends LitElement {
         this.audioMode = e.target.value;
         await cheatingDaddy.storage.updatePreference('audioMode', this.audioMode);
         this.requestUpdate();
+    }
+
+    async handleScreenSharingChange(event) {
+        const input = event.target;
+        this.sharingBusy = true;
+        this.sharingError = '';
+        try {
+            const result = await window.require('electron').ipcRenderer.invoke('set-screen-sharing-visibility', input.checked);
+            if (!result.success) throw Error(result.error);
+            this.showInScreenSharing = input.checked;
+        } catch (error) {
+            input.checked = this.showInScreenSharing;
+            this.sharingError = error.message;
+        } finally {
+            this.sharingBusy = false;
+        }
     }
 
     async handleThemeChange(e) {
@@ -626,6 +649,17 @@ export class CustomizeView extends LitElement {
         return html`
             <section class="surface">
                 <div class="surface-title">Appearance</div>
+                <label class="toggle-row">
+                    <span class="toggle-label">Показывать окно при демонстрации экрана</span>
+                    <input
+                        class="toggle-input"
+                        type="checkbox"
+                        .checked=${this.showInScreenSharing}
+                        ?disabled=${this.sharingBusy}
+                        @change=${this.handleScreenSharingChange}
+                    />
+                </label>
+                ${this.sharingError ? html`<div role="alert">${this.sharingError}</div>` : ''}
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label">Theme</label>

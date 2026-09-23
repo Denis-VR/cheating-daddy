@@ -5,7 +5,7 @@ const storage = require('../storage');
 let mouseEventsIgnored = false;
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
-const MIN_WINDOW_SIZE = { width: 700, height: 320 };
+const MIN_WINDOW_SIZE = { width: 380, height: 240 };
 
 function createWindow(sendToRenderer, geminiSessionRef) {
     let windowWidth = DEFAULT_MAIN_WINDOW_SIZE.width;
@@ -54,7 +54,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         { useSystemPicker: true }
     );
 
-    mainWindow.setContentProtection(true);
+    mainWindow.setContentProtection(storage.getConfig().showInScreenSharing !== true);
     if (process.platform === 'win32') {
         mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
@@ -347,6 +347,20 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
+    ipcMain.removeHandler('set-screen-sharing-visibility');
+    ipcMain.handle('set-screen-sharing-visibility', (event, visible) => {
+        if (event.sender !== mainWindow.webContents || typeof visible !== 'boolean') return { success: false, error: 'Некорректный запрос' };
+        const previous = storage.getConfig().showInScreenSharing === true;
+        try {
+            mainWindow.setContentProtection(!visible);
+            storage.setConfig({ showInScreenSharing: visible });
+            return { success: true };
+        } catch (error) {
+            mainWindow.setContentProtection(!previous);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.removeHandler('capture-screen-draft');
     let screenCapturePending = false;
     ipcMain.handle('capture-screen-draft', async event => {

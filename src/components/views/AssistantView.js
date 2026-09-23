@@ -2,6 +2,8 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
 import { InterviewTools } from './InterviewTools.js';
 
+const DEFAULT_QUICK_ACTIONS = ['Короче', 'Пример на Go', 'Почему?', 'Сравнить'].map(label => ({ label, prompt: label }));
+
 export class AssistantView extends LitElement {
     static styles = css`
         :host {
@@ -267,7 +269,43 @@ export class AssistantView extends LitElement {
 
         /* ── Bottom input bar ── */
 
+        .action-editor {
+            padding: 8px 10px;
+            max-height: 40vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .action-row {
+            display: grid;
+            grid-template-columns: minmax(70px, 1fr) minmax(100px, 2fr) auto;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        .action-row input,
+        .action-row textarea {
+            min-width: 0;
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px;
+            font: inherit;
+            font-size: 13px;
+        }
+        .quick-followups {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 6px 10px;
+            flex-shrink: 0;
+        }
+        .quick-followups .analyze-btn {
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+
         .input-bar {
+            flex-wrap: wrap;
             display: flex;
             align-items: center;
             gap: var(--space-sm);
@@ -276,6 +314,7 @@ export class AssistantView extends LitElement {
         }
 
         .input-bar-inner {
+            min-width: 120px;
             display: flex;
             align-items: center;
             flex: 1;
@@ -370,6 +409,10 @@ export class AssistantView extends LitElement {
     `;
 
     static properties = {
+        quickActions: { state: true },
+        actionDraft: { state: true },
+        actionError: { state: true },
+        actionSaving: { state: true },
         pendingImage: { state: true },
         attachments: { state: true },
         hostedMode: { type: Boolean },
@@ -387,6 +430,8 @@ export class AssistantView extends LitElement {
     constructor() {
         super();
         this.responses = [];
+        this.quickActions = DEFAULT_QUICK_ACTIONS.map(a => ({ ...a }));
+        this.actionDraft = null;
         this.manualRequestRevision = 0;
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
@@ -458,15 +503,23 @@ export class AssistantView extends LitElement {
                 /* Keep escaped plain code for unsupported input. */
             }
         }
-        for (const heading of [...doc.querySelectorAll('h2')]) {
-            if (!['Объяснить', 'Углубиться'].includes(heading.textContent.trim())) continue;
+        for (const heading of [...doc.querySelectorAll('h2, h3')]) {
+            const section = heading.textContent.trim().match(/^(Объяснить|Углубиться)(?=$|[\s(:—–-])/i)?.[1];
+            if (!section) continue;
             const details = doc.createElement('details');
             const summary = doc.createElement('summary');
-            summary.textContent = heading.textContent;
+            summary.textContent = section[0].toUpperCase() + section.slice(1).toLowerCase();
+            details.open = false;
             details.appendChild(summary);
             heading.before(details);
             let node = heading.nextSibling;
-            while (node && !(node.nodeType === 1 && ['H2', 'HR'].includes(node.tagName))) {
+            while (
+                node &&
+                !(
+                    node.nodeType === 1 &&
+                    (node.tagName === 'HR' || (/^H[1-6]$/.test(node.tagName) && Number(node.tagName[1]) <= Number(heading.tagName[1])))
+                )
+            ) {
                 const next = node.nextSibling;
                 details.appendChild(node);
                 node = next;
@@ -557,6 +610,13 @@ export class AssistantView extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+        window.cheatingDaddy?.storage
+            ?.getPreferences()
+            .then(prefs => {
+                if (Array.isArray(prefs.quickActions))
+                    this.quickActions = prefs.quickActions.filter(a => a && typeof a.label === 'string' && typeof a.prompt === 'string').slice(0, 12);
+            })
+            .catch(console.error);
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -601,6 +661,42 @@ export class AssistantView extends LitElement {
         root.style.setProperty('--response-font-size', `${size}px`);
         window.cheatingDaddy.storage.updatePreference('fontSize', size).catch(console.error);
     }
+    async saveQuickActions() {
+        if (this.actionSaving) return;
+        const actions = this.actionDraft.map(a => ({ label: a.label.trim(), prompt: a.prompt.trim() }));
+        if (actions.length > 12 || actions.some(a => !a.label || !a.prompt || a.label.length > 40 || a.prompt.length > 3000)) {
+            this.actionError = 'Заполните название и запрос';
+            return;
+        }
+        this.actionSaving = true;
+        try {
+            const result = await window.cheatingDaddy.storage.updatePreference('quickActions', actions);
+            if (!result.success) throw Error(result.error || 'Не удалось сохранить');
+            this.quickActions = actions;
+            this.actionDraft = null;
+            this.actionError = '';
+        } catch (e) {
+            this.actionError = e.message;
+        } finally {
+            this.actionSaving = false;
+        }
+    }
+
+    async handleQuickFollowup(text) {
+        if (this.isAnalyzing || this.currentResponseIndex < 0) return;
+        const tools = this.shadowRoot.querySelector('interview-tools');
+        if (!tools || tools.busy) return;
+        this.isAnalyzing = true;
+        try {
+            await tools.perform(async () => {
+                await tools.ask(text, { routing: 'current' });
+                tools.status = '';
+            });
+        } finally {
+            this.isAnalyzing = false;
+        }
+    }
+
     async handleSendText() {
         if (this.isAnalyzing) return;
         const textInput = this.shadowRoot.querySelector('#textInput');
@@ -909,12 +1005,12 @@ export class AssistantView extends LitElement {
                         ? html`<button class="analyze-btn" @click=${() => this.changeFontSize(-2)}>A−</button>
                               <button
                                   class="analyze-btn"
-                                  title="Только ответ / настройки (Cmd/Ctrl+Shift+F)"
+                                  title="Вернуть панели (Cmd/Ctrl+Shift+F)"
                                   @click=${() => {
                                       owner.focusMode = !owner.focusMode;
                                   }}
                               >
-                                  ${this.focusMode ? '⚙ Настройки' : 'Только ответ'}</button
+                                  Вернуть панели</button
                               ><button class="analyze-btn" @click=${() => this.changeFontSize(2)}>A+</button
                               ><button
                                   class="analyze-btn"
@@ -924,15 +1020,7 @@ export class AssistantView extends LitElement {
                               >
                                   ${this.paused ? 'Продолжить' : 'Пауза'}</button
                               ><button class="analyze-btn" title="Завершить сессию" @click=${() => owner.endSession()}>⏹</button>`
-                        : html` <button
-                              class="analyze-btn"
-                              title="Только ответ / настройки (Cmd/Ctrl+Shift+F)"
-                              @click=${() => {
-                                  owner.focusMode = !owner.focusMode;
-                              }}
-                          >
-                              ${this.focusMode ? '⚙ Настройки' : 'Только ответ'}
-                          </button>`
+                        : ''
                 }
             </div>
             ${failures.map(([id, r]) => html`<div style="padding:6px 12px;font-size:14px">${r.question.slice(0, 80)}: ${r.error}<button class="analyze-btn" @click=${() => this.shadowRoot.querySelector('interview-tools').retry(id)}>Повторить запрос</button></div>`)}
@@ -1019,6 +1107,82 @@ export class AssistantView extends LitElement {
                       </div>`
                     : ''
             }
+            ${
+                this.hostedMode
+                    ? html`<div class="quick-followups" role="group" aria-label="Уточнить ответ">
+                          ${this.quickActions.map(
+                              action =>
+                                  html`<button
+                                      class="analyze-btn"
+                                      ?disabled=${this.isAnalyzing || this.currentResponseIndex < 0 || !this.getCurrentResponse()?.trim()}
+                                      @click=${() => this.handleQuickFollowup(action.prompt)}
+                                  >
+                                      ${action.label}
+                                  </button>`
+                          )}
+                          <button
+                              class="analyze-btn"
+                              title="Изменить быстрые действия"
+                              aria-label="Изменить быстрые действия"
+                              @click=${() => {
+                                  this.actionError = '';
+                                  this.actionDraft = this.quickActions.map(a => ({ ...a }));
+                              }}
+                          >
+                              ✎
+                          </button>
+                      </div>`
+                    : ''
+            }
+            ${
+                this.actionDraft
+                    ? html`<div class="action-editor">
+                          ${this.actionDraft.map(
+                              (action, i) =>
+                                  html`<div class="action-row">
+                                      <input
+                                          aria-label="Название действия"
+                                          placeholder="Название"
+                                          maxlength="40"
+                                          .value=${action.label}
+                                          @input=${e => {
+                                              action.label = e.target.value;
+                                          }}
+                                      />
+                                      <textarea
+                                          aria-label="Запрос действия"
+                                          placeholder="Запрос"
+                                          maxlength="3000"
+                                          .value=${action.prompt}
+                                          @input=${e => {
+                                              action.prompt = e.target.value;
+                                          }}
+                                      ></textarea>
+                                      <button
+                                          class="analyze-btn"
+                                          aria-label="Удалить действие"
+                                          ?disabled=${this.actionSaving}
+                                          @click=${() => (this.actionDraft = this.actionDraft.filter((_, index) => index !== i))}
+                                      >
+                                          ×
+                                      </button>
+                                  </div>`
+                          )}
+                          <div class="quick-followups">
+                              <button
+                                  class="analyze-btn"
+                                  ?disabled=${this.actionSaving || this.actionDraft.length >= 12}
+                                  @click=${() => (this.actionDraft = [...this.actionDraft, { label: '', prompt: '' }])}
+                              >
+                                  +
+                              </button>
+                              <button class="analyze-btn" ?disabled=${this.actionSaving} @click=${this.saveQuickActions}>Сохранить</button>
+                              <button class="analyze-btn" ?disabled=${this.actionSaving} @click=${() => (this.actionDraft = null)}>Отмена</button>
+                          </div>
+                          ${this.actionError ? html`<div role="alert">${this.actionError}</div>` : ''}
+                      </div>`
+                    : ''
+            }
             <div class="input-bar">
                 <div class="input-bar-inner">
                     <input
@@ -1041,14 +1205,6 @@ export class AssistantView extends LitElement {
                         this.handleImageFile(file);
                     }}
                 />
-                <button
-                    class="analyze-btn"
-                    ?disabled=${this.isAnalyzing}
-                    title="Прикрепить скриншот. Можно также вставить изображение в поле ввода."
-                    @click=${() => this.shadowRoot.querySelector('#screenshotFile').click()}
-                >
-                    📎 Скриншот
-                </button>
                 <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer}>
                     <canvas class="analyze-canvas"></canvas>
                     <span class="analyze-btn-content">

@@ -103,7 +103,7 @@ function responseInstructions(mode = 'answer') {
         );
     return (
         base +
-        '\nUse exactly these Markdown headings in order: ## Сказать сейчас (2–3 spoken sentences), ## Объяснить (clear explanation), ## Углубиться (technical details and an example). These output requirements override conflicting length/format requirements in the selected profile.'
+        '\nUse exactly these Markdown headings, each on its own line: ## Сказать сейчас; ## Объяснить; ## Углубиться. Do not append translations, parentheses, descriptions or English labels to headings. Under the first heading write 2–3 spoken sentences, under the second a clear explanation, under the third technical details and an example. These output requirements override conflicting length/format requirements in the selected profile.'
     );
 }
 function validateRequest(input) {

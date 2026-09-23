@@ -224,8 +224,13 @@ function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true)
     return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
 }
 
+function getHostedSystemPrompt(profile, customPrompt, language) {
+    return `${getSystemPrompt(profile, customPrompt, false)}\nRespond in ${language}. Use valid GitHub-flavored Markdown tables when the user asks for a table or a comparison benefits from one. Do not wrap tables in code fences.`;
+}
+
 module.exports = {
     profilePrompts,
     buildSystemPrompt,
     getSystemPrompt,
+    getHostedSystemPrompt,
 };

@@ -12,7 +12,9 @@ test('window size survives close and is restored within current display bounds',
             this.bounds = { width: options.width, height: options.height };
             this.webContents = { once() {} };
         }
-        setContentProtection() {}
+        setContentProtection(value) {
+            this.protected = value;
+        }
         setHiddenInMissionControl() {}
         loadFile() {}
         isDestroyed() {
@@ -22,11 +24,19 @@ test('window size survives close and is restored within current display bounds',
             return this.bounds;
         }
     }
+    const handlers = new Map();
     const electron = {
         session: { defaultSession: { setDisplayMediaRequestHandler() {} } },
         BrowserWindow: Window,
         screen: { getPrimaryDisplay: () => ({ workArea: { width: 1440, height: 900 } }) },
-        ipcMain: { handle() {}, on() {}, removeHandler() {}, removeAllListeners() {} },
+        ipcMain: {
+            handle(name, fn) {
+                handlers.set(name, fn);
+            },
+            on() {},
+            removeHandler() {},
+            removeAllListeners() {},
+        },
     };
     const context = {
         module: { exports: {} },
@@ -48,11 +58,24 @@ test('window size survives close and is restored within current display bounds',
     vm.runInNewContext(fs.readFileSync('src/utils/window.js', 'utf8'), context);
     const create = () => context.module.exports.createWindow(() => {}, { current: null });
     const first = create();
+    assert.equal(first.protected, true);
+    const toggle = handlers.get('set-screen-sharing-visibility');
+    assert.equal(toggle({ sender: {} }, true).success, false);
+    assert.equal(toggle({ sender: first.webContents }, 'yes').success, false);
+    assert.equal(toggle({ sender: first.webContents }, true).success, true);
+    assert.equal(first.protected, false);
+    assert.equal(config.showInScreenSharing, true);
     assert.equal(first.options.width, 960);
+    assert.equal(first.options.minWidth, 380);
+    assert.equal(first.options.minHeight, 240);
     first.bounds = { width: 1250, height: 750 };
     first.emit('resize');
     first.emit('close');
     const second = create();
+    assert.equal(second.protected, false);
+    assert.equal(handlers.get('set-screen-sharing-visibility')({ sender: second.webContents }, false).success, true);
+    assert.equal(second.protected, true);
+    assert.equal(config.showInScreenSharing, false);
     assert.equal(second.options.width, 1250);
     assert.equal(second.options.height, 750);
     config.windowBounds = { width: 4000, height: 3000 };

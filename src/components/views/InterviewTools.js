@@ -5,6 +5,8 @@ export class InterviewTools extends LitElement {
         preparationOnly: { type: Boolean, reflect: true },
         tab: { state: true },
         collapsed: { state: true },
+        selectedTopics: { state: true },
+        splitRequestId: { state: true },
         inbox: { state: true },
         questionId: { state: true },
         questionText: { state: true },
@@ -50,6 +52,10 @@ export class InterviewTools extends LitElement {
             border-radius: 7px;
             padding: 7px;
             user-select: text;
+        }
+        select {
+            max-width: 100%;
+            min-width: 0;
         }
         button {
             cursor: pointer;
@@ -178,6 +184,8 @@ export class InterviewTools extends LitElement {
         super();
         this.tab = 'questions';
         this.collapsed = false;
+        this.selectedTopics = [];
+        this.splitRequestId = '';
         this.inbox = [];
         this.questionId = '';
         this.questionText = '';
@@ -556,6 +564,9 @@ export class InterviewTools extends LitElement {
     render() {
         const selected = this.inbox.find(q => q.id === this.questionId);
         const owner = this.owner;
+        const selectedTopics = this.selectedTopics.filter(i => owner.topicMeta?.[i] && !owner.topicMeta[i].hidden);
+        const splitOptions =
+            selectedTopics.length === 1 ? [...(owner._inlineRequests?.entries() || [])].filter(([, r]) => r.index === selectedTopics[0]) : [];
         return html` ${
             !this.preparationOnly
                 ? html`<div class="bar">
@@ -589,6 +600,28 @@ export class InterviewTools extends LitElement {
                           <option value="design">System design</option>
                           <option value="prep">Вакансия</option>
                       </select>
+                      <select aria-label="Тема ответа" .value=${this.routing} @change=${e => (this.routing = e.target.value)}>
+                          <option value="auto">Определить тему</option>
+                          <option value="current">Текущая тема</option>
+                          <option value="new">Новая тема</option>
+                      </select>
+                      <select aria-label="Формат ответа" .value=${this.mode} @change=${e => (this.mode = e.target.value)}>
+                          <option value="answer">Ответ</option>
+                          <option value="technical">Задача</option>
+                      </select>
+                      <span class="reading-controls"
+                          ><button
+                              title="Уменьшить шрифт"
+                              @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: -2, bubbles: true, composed: true }))}
+                          >
+                              A−</button
+                          ><button
+                              title="Увеличить шрифт"
+                              @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: 2, bubbles: true, composed: true }))}
+                          >
+                              A+
+                          </button></span
+                      >
                       <button
                           title=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
                           aria-label=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
@@ -610,37 +643,6 @@ export class InterviewTools extends LitElement {
                               />
                           </svg>
                       </button>
-                      <details class="options">
-                          <summary>Настройки ответа</summary>
-                          <div class="options-body">
-                              <select aria-label="Тема ответа" .value=${this.routing} @change=${e => (this.routing = e.target.value)}>
-                                  <option value="auto">Определить тему</option>
-                                  <option value="current">Текущая тема</option>
-                                  <option value="new">Новая тема</option></select
-                              ><select .value=${this.mode} @change=${e => (this.mode = e.target.value)}>
-                                  <option value="answer">Ответ в 3 уровня</option>
-                                  <option value="technical">Техническая задача</option>
-                              </select>
-                          </div>
-                      </details>
-                      <span class="reading-controls"
-                          ><button
-                              title="Уменьшить шрифт"
-                              @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: -2, bubbles: true, composed: true }))}
-                          >
-                              A−</button
-                          ><button
-                              title="Только ответ (Cmd/Ctrl+Shift+F)"
-                              @click=${() => this.dispatchEvent(new CustomEvent('focus-toggle', { bubbles: true, composed: true }))}
-                          >
-                              Только ответ</button
-                          ><button
-                              title="Увеличить шрифт"
-                              @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: 2, bubbles: true, composed: true }))}
-                          >
-                              A+
-                          </button></span
-                      >
                   </div>`
                 : ''
         }
@@ -651,97 +653,117 @@ export class InterviewTools extends LitElement {
                       ${
                           !this.preparationOnly && this.tab === 'questions'
                               ? html`${this.inbox.map(q => html`<button class=${q.id === this.questionId ? 'active' : ''} @click=${() => this.selectQuestion(q)}>${q.text.slice(0, 85)}</button>`)}${
-                                        selected
-                                            ? html`<textarea
-                                                      .value=${this.questionText}
-                                                      @input=${e => (this.questionText = e.target.value)}
-                                                  ></textarea
-                                                  >${selected.revision !== this.revision ? html`<button @click=${() => this.selectQuestion(selected)}>Получено дополнение — загрузить новую версию</button>` : ''}<button
-                                                      ?disabled=${this.busy || selected.revision !== this.revision}
-                                                      @click=${this.sendQuestion}
-                                                  >
-                                                      Ответить на вопрос</button
-                                                  ><button
-                                                      ?disabled=${this.busy}
-                                                      @click=${() =>
-                                                          this.perform(async () => {
-                                                              await this.call('discard-question', { id: selected.id, revision: selected.revision });
-                                                              this.questionId = '';
-                                                              this.questionText = '';
-                                                              this.status = 'Вопрос удалён';
-                                                          })}
-                                                  >
-                                                      Пропустить
-                                                  </button>`
-                                            : ''
-                                    }
-                                    <div class="bar">
-                                        ${['Короче', 'Пример на Go', 'Почему?', 'Сравнить'].map(
-                                            text =>
-                                                html`<button
-                                                    ?disabled=${this.busy || owner.currentResponseIndex < 0}
-                                                    @click=${() =>
-                                                        this.perform(async () => {
-                                                            await this.ask(text, { routing: 'current' });
-                                                            this.status = '';
-                                                        })}
-                                                >
-                                                    ${text}
-                                                </button>`
-                                        )}
-                                    </div>`
+                                    selected
+                                        ? html`<textarea .value=${this.questionText} @input=${e => (this.questionText = e.target.value)}></textarea
+                                              >${selected.revision !== this.revision ? html`<button @click=${() => this.selectQuestion(selected)}>Получено дополнение — загрузить новую версию</button>` : ''}<button
+                                                  ?disabled=${this.busy || selected.revision !== this.revision}
+                                                  @click=${this.sendQuestion}
+                                              >
+                                                  Ответить на вопрос</button
+                                              ><button
+                                                  ?disabled=${this.busy}
+                                                  @click=${() =>
+                                                      this.perform(async () => {
+                                                          await this.call('discard-question', { id: selected.id, revision: selected.revision });
+                                                          this.questionId = '';
+                                                          this.questionText = '';
+                                                          this.status = 'Вопрос удалён';
+                                                      })}
+                                              >
+                                                  Пропустить
+                                              </button>`
+                                        : ''
+                                } `
                               : ''
                       }
                       ${
                           !this.preparationOnly && this.tab === 'topics'
                               ? html`<div class="bar">
                                         <button
+                                            aria-label="Новая тема"
+                                            title="Новая тема"
                                             @click=${() => {
                                                 owner.openResponseCard();
                                                 this.tab = '';
                                             }}
                                         >
-                                            + Новая тема</button
+                                            +</button
                                         ><button
+                                            ?disabled=${selectedTopics.length < 2}
                                             @click=${() => {
-                                                owner.mergeTopic();
+                                                owner.mergeTopic(selectedTopics);
+                                                this.selectedTopics = [];
+                                                this.splitRequestId = '';
                                                 this.requestUpdate();
                                             }}
                                         >
                                             Объединить</button
                                         ><button
+                                            ?disabled=${!splitOptions.some(([id]) => id === this.splitRequestId)}
                                             @click=${() => {
-                                                owner.splitTopic();
+                                                owner.splitTopic(this.splitRequestId);
+                                                this.selectedTopics = [];
+                                                this.splitRequestId = '';
                                                 this.requestUpdate();
                                             }}
                                         >
-                                            Отделить уточнение
+                                            Отделить
                                         </button>
                                     </div>
                                     ${(owner.topicMeta || []).map((m, i) =>
                                         m.hidden
                                             ? ''
                                             : html`<div class="bar">
-                                                  <button
-                                                      style="flex:1;text-align:left"
-                                                      class=${i === owner.currentResponseIndex ? 'active' : ''}
-                                                      @click=${() => {
-                                                          owner.currentResponseIndex = i;
-                                                          owner.requestUpdate();
-                                                          this.tab = '';
-                                                      }}
-                                                  >
-                                                      ${m.title || 'Новая тема'}</button
-                                                  ><button
-                                                      aria-label="Удалить тему"
-                                                      @click=${() => {
-                                                          owner.deleteTopic(i);
-                                                          this.requestUpdate();
-                                                      }}
-                                                  >
-                                                      Удалить
-                                                  </button>
-                                              </div>`
+                                                      <input
+                                                          type="checkbox"
+                                                          aria-label=${`Выбрать тему: ${m.title || 'Новая тема'}`}
+                                                          .checked=${selectedTopics.includes(i)}
+                                                          @change=${e => {
+                                                              this.selectedTopics = e.target.checked
+                                                                  ? [...selectedTopics, i]
+                                                                  : selectedTopics.filter(index => index !== i);
+                                                              this.splitRequestId = '';
+                                                          }}
+                                                      />
+                                                      <button
+                                                          style="flex:1;text-align:left"
+                                                          class=${i === owner.currentResponseIndex ? 'active' : ''}
+                                                          @click=${() => {
+                                                              owner.currentResponseIndex = i;
+                                                              owner.requestUpdate();
+                                                              this.tab = '';
+                                                          }}
+                                                      >
+                                                          ${m.title || 'Новая тема'}</button
+                                                      ><button
+                                                          aria-label="Удалить тему"
+                                                          @click=${() => {
+                                                              owner.deleteTopic(i);
+                                                              this.requestUpdate();
+                                                          }}
+                                                      >
+                                                          Удалить
+                                                      </button>
+                                                  </div>
+                                                  ${
+                                                      selectedTopics.length === 1 && selectedTopics[0] === i
+                                                          ? html`<div class="split-choices">
+                                                                ${splitOptions.map(
+                                                                    ([id, r]) =>
+                                                                        html`<label style="display:flex;gap:8px;align-items:center;padding:5px 10px">
+                                                                            <input
+                                                                                type="radio"
+                                                                                name="split-request"
+                                                                                aria-label=${r.question}
+                                                                                .checked=${this.splitRequestId === id}
+                                                                                @change=${() => (this.splitRequestId = id)}
+                                                                            />
+                                                                            <span>${r.question}</span>
+                                                                        </label>`
+                                                                )}
+                                                            </div>`
+                                                          : ''
+                                                  }`
                                     )}`
                               : ''
                       }
@@ -766,71 +788,53 @@ export class InterviewTools extends LitElement {
                                         >
                                             Проверить Docker
                                         </button>
+                                        <button
+                                            ?disabled=${this.busy}
+                                            @click=${() =>
+                                                this.perform(async () => {
+                                                    this.executionSnapshot = JSON.stringify({
+                                                        language: this.language,
+                                                        code: this.code,
+                                                        tests: '',
+                                                    });
+                                                    const r = await this.ipc.invoke('interview:run-code', {
+                                                        language: this.language,
+                                                        code: this.code,
+                                                        tests: '',
+                                                    });
+                                                    this.execution = JSON.stringify(r, null, 2);
+                                                    this.status = r.success
+                                                        ? 'Проверка завершена успешно'
+                                                        : r.error || 'Ошибка выполнения — смотрите вывод';
+                                                })}
+                                        >
+                                            Запустить</button
+                                        ><button
+                                            ?disabled=${this.busy}
+                                            @click=${() =>
+                                                this.perform(async () => {
+                                                    await this.ask(
+                                                        'Проверь решение и объясни ошибки. Язык: ' +
+                                                            this.language +
+                                                            '\nКод:\n' +
+                                                            this.code +
+                                                            '\nВывод проверки текущего кода:\n' +
+                                                            (this.executionSnapshot ===
+                                                            JSON.stringify({ language: this.language, code: this.code, tests: '' })
+                                                                ? this.execution
+                                                                : 'Текущий код ещё не запускался'),
+                                                        { mode: 'technical', routing: 'current' }
+                                                    );
+                                                    this.status = 'Разбор готов';
+                                                })}
+                                        >
+                                            Разобрать с AI
+                                        </button>
                                     </div>
-                                    <div class="grid">
-                                        <label
-                                            >Код<textarea
-                                                class="mono"
-                                                .value=${this.code}
-                                                @input=${e => (this.code = e.target.value)}
-                                            ></textarea></label
-                                        ><label
-                                            >Тесты (Go: package main; SQL: проверки / SELECT)<textarea
-                                                class="mono"
-                                                .value=${this.tests}
-                                                @input=${e => (this.tests = e.target.value)}
-                                            ></textarea>
-                                        </label>
-                                    </div>
-                                    <button
-                                        ?disabled=${this.busy}
-                                        @click=${() =>
-                                            this.perform(async () => {
-                                                this.executionSnapshot = JSON.stringify({
-                                                    language: this.language,
-                                                    code: this.code,
-                                                    tests: this.tests,
-                                                });
-                                                const r = await this.ipc.invoke('interview:run-code', {
-                                                    language: this.language,
-                                                    code: this.code,
-                                                    tests: this.tests,
-                                                });
-                                                this.execution = JSON.stringify(r, null, 2);
-                                                this.status = r.success
-                                                    ? 'Проверка завершена успешно'
-                                                    : r.error || 'Ошибка выполнения — смотрите вывод';
-                                            })}
-                                    >
-                                        Запустить в изоляции</button
-                                    ><button
-                                        ?disabled=${this.busy}
-                                        @click=${() =>
-                                            this.perform(async () => {
-                                                await this.ask(
-                                                    'Проверь решение и объясни ошибки. Язык: ' +
-                                                        this.language +
-                                                        '\nКод:\n' +
-                                                        this.code +
-                                                        '\nТесты:\n' +
-                                                        this.tests +
-                                                        '\nВывод проверки текущего кода:\n' +
-                                                        (this.executionSnapshot ===
-                                                        JSON.stringify({ language: this.language, code: this.code, tests: this.tests })
-                                                            ? this.execution
-                                                            : 'Текущий код ещё не запускался'),
-                                                    { mode: 'technical', routing: 'current' }
-                                                );
-                                                this.status = 'Разбор готов';
-                                            })}
-                                    >
-                                        Разобрать с AI
-                                    </button>
-                                    <pre class="mono">${this.execution}</pre>
-                                    <p class="muted">
-                                        Без сети, 512 МБ, 1 CPU, лимит 45 секунд. Go без внешних зависимостей. SQL проверяется в SQLite, не
-                                        PostgreSQL.
-                                    </p>`
+                                    <label
+                                        >Код<textarea class="mono" .value=${this.code} @input=${e => (this.code = e.target.value)}></textarea>
+                                    </label>
+                                    <pre class="mono">${this.execution}</pre>`
                               : ''
                       }
                       ${

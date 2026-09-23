@@ -9,12 +9,19 @@ const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
     layout: 'normal',
+    showInScreenSharing: false,
     geminiLiveModel: 'gemini-3.1-flash-live-preview',
     groqModel: 'qwen/qwen3.6-27b',
     groqImageModel: 'qwen/qwen3.6-27b',
     disableGroqThinking: true,
     openaiModel: 'gpt-4o-mini',
-    openrouterModel: 'openai/gpt-4o-mini',
+    openrouterModel: 'openai/gpt-5.4-nano',
+    openaiTranscriptionModel: 'whisper-1',
+    openrouterTranscriptionModel: 'openai/whisper-1',
+    openaiOcrModel: 'gpt-4o-mini',
+    openrouterOcrModel: 'google/gemini-2.5-flash-lite',
+    openaiVisionModel: '',
+    openrouterVisionModel: '',
 };
 
 const DEFAULT_CREDENTIALS = {

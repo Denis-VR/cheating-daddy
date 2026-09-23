@@ -226,6 +226,33 @@ function installSessionSupport(ipcMain, isActive) {
             return { success: false, error: e.message };
         }
     };
+    const benchmarks = new Map();
+    ipcMain.handle('session:benchmark-cancel', event => {
+        benchmarks.get(event.sender.id)?.abort();
+        return { success: true };
+    });
+    ipcMain.handle('session:benchmark', async (event, input) => {
+        if (isActive() || benchmarks.size) return { success: false, error: 'Дождитесь завершения текущей проверки или сессии' };
+        const controller = new AbortController();
+        const senderId = event.sender.id;
+        const stop = () => controller.abort();
+        benchmarks.set(senderId, controller);
+        event.sender.once('destroyed', stop);
+        try {
+            const data = await require('./model-benchmark').benchmarkModels(input, {
+                signal: controller.signal,
+                onResult: row => {
+                    if (!event.sender.isDestroyed()) event.sender.send('session:benchmark-result', row);
+                },
+            });
+            return { success: true, data };
+        } catch (e) {
+            return { success: false, error: e.message };
+        } finally {
+            benchmarks.delete(senderId);
+            if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', stop);
+        }
+    });
     ipcMain.handle('session:recovery-load', guarded(readRecovery));
     ipcMain.handle('session:recovery-save', guarded(saveRecovery));
     ipcMain.on('session:recovery-sync', (event, value) => {

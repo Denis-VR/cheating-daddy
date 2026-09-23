@@ -45,7 +45,7 @@ test('main IPC accepts text and screen requests on pause and propagates their re
                     BrowserWindow: { getAllWindows: () => [{ webContents: { send: (...args) => events.push(args) } }] },
                 };
             if (name === '../storage') return { saveSession() {}, getConfig: () => ({}), getCredentials: () => ({ openrouterKey: 'test' }) };
-            if (name === './prompts') return { getSystemPrompt: () => 'Helpful assistant' };
+            if (name === './prompts') return { getSystemPrompt: () => 'Helpful assistant', getHostedSystemPrompt: () => 'Helpful assistant' };
             if (name === './transportLogger') return { startTransportLog() {}, closeTransportLog() {} };
             return {};
         },

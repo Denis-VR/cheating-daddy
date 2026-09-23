@@ -1,5 +1,11 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
+const OPENROUTER_RESPONSE_MODELS = [
+    { id: 'openai/gpt-5-nano', label: 'GPT-5 Nano', speed: 5, reasoning: 2, input: '0.05', output: '0.40' },
+    { id: 'openai/gpt-5.4-mini', label: 'GPT-5.4 Mini', speed: 4, reasoning: 4, input: '0.75', output: '4.50' },
+    { id: 'openai/gpt-5.4-nano', label: 'GPT-5.4 Nano', speed: 4, reasoning: 3, input: '0.20', output: '1.25' },
+];
+
 const LOCAL_LLM_PRESETS = [
     { value: 'unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M', label: 'Qwen 3.5 0.8B Q4 — 0.74 GB · Fastest' },
     { value: 'unsloth/Qwen3.5-0.8B-GGUF:Q8_0', label: 'Qwen 3.5 0.8B Q8 — 1.02 GB' },
@@ -29,6 +35,167 @@ export class MainView extends LitElement {
             align-items: center;
             justify-content: flex-start;
             padding: 0;
+        }
+
+        .benchmark-toggle,
+        .benchmark-actions button {
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            border-radius: 7px;
+            padding: 9px 12px;
+            cursor: pointer;
+        }
+        .benchmark-panel {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+        }
+        .benchmark-panel textarea {
+            box-sizing: border-box;
+            width: 100%;
+            min-height: 90px;
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            border-radius: 7px;
+            padding: 10px;
+            font: inherit;
+        }
+        .benchmark-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .benchmark-actions button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        .benchmark-result {
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 10px;
+        }
+        .benchmark-result summary {
+            display: flex;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+        .benchmark-result pre {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font: inherit;
+            font-size: 13px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .model-cards {
+            display: grid;
+            gap: 8px;
+        }
+        .model-card {
+            display: block;
+            width: 100%;
+            padding: 13px 14px;
+            text-align: left;
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            border-radius: 10px;
+            cursor: pointer;
+            font: inherit;
+        }
+        .model-card:hover {
+            border-color: #707780;
+        }
+        .model-card[aria-pressed='true'] {
+            border-color: #79b9ac;
+            background: #142321;
+        }
+        .model-card:focus-visible,
+        .custom-model:focus-visible {
+            outline: 2px solid #79b9ac;
+            outline-offset: 3px;
+        }
+        .model-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .model-radio {
+            width: 13px;
+            height: 13px;
+            border: 1px solid #727c7b;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .model-card[aria-pressed='true'] .model-radio {
+            background: #91d4c4;
+            border-color: #91d4c4;
+            box-shadow: inset 0 0 0 3px #142321;
+        }
+        .model-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .model-metric {
+            display: grid;
+            gap: 6px;
+        }
+        .model-metric-label {
+            display: flex;
+            justify-content: space-between;
+            color: #abb5b8;
+            font-size: 11px;
+        }
+        .model-meter {
+            display: flex;
+            gap: 4px;
+        }
+        .model-meter i {
+            height: 3px;
+            flex: 1;
+            border-radius: 3px;
+            background: #394344;
+        }
+        .model-meter i.filled {
+            background: #91d4c4;
+        }
+        .model-price {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px 14px;
+            margin-top: 11px;
+            color: #b3bdc0;
+            font-size: 11px;
+        }
+        .model-price strong {
+            color: #f2f7f6;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .model-price-unit {
+            color: #b3bdc0;
+            font-size: 11px;
+            line-height: 1.5;
+            margin-top: 6px;
+        }
+        .custom-model {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px dashed var(--border-strong);
+            border-radius: 8px;
+            padding: 9px;
+            cursor: pointer;
+        }
+        .custom-model[aria-pressed='true'] {
+            border-color: #91d4c4;
+            color: #91d4c4;
         }
 
         .form-wrapper {
@@ -694,6 +861,15 @@ export class MainView extends LitElement {
         downloadProgress: { type: Object },
         onCancelDownload: { type: Function },
         // Internal state
+        _benchmarkImages: { state: true },
+        _benchmarkOpen: { state: true },
+        _benchmarkBusy: { state: true },
+        _benchmarkText: { state: true },
+        _benchmarkResults: { state: true },
+        _benchmarkError: { state: true },
+        _recording: { state: true },
+        _recordedAudio: { state: true },
+        _audioPending: { state: true },
         _mode: { state: true },
         _instructionName: { state: true },
         _token: { state: true },
@@ -703,6 +879,9 @@ export class MainView extends LitElement {
         _openrouterKey: { state: true },
         _openaiModel: { state: true },
         _openrouterModel: { state: true },
+        _hostedModels: { state: true },
+        _customRouterModel: { state: true },
+        _customStt: { state: true },
         _geminiLiveModel: { state: true },
         _groqModel: { state: true },
         _groqImageModel: { state: true },
@@ -736,7 +915,13 @@ export class MainView extends LitElement {
         this._openaiKey = '';
         this._openrouterKey = '';
         this._openaiModel = 'gpt-4o-mini';
-        this._openrouterModel = 'openai/gpt-4o-mini';
+        this._openrouterModel = 'openai/gpt-5.4-nano';
+        this._hostedModels = {};
+        this._benchmarkText = '';
+        this._benchmarkImages = [];
+        this._benchmarkResults = [];
+        this._recordEpoch = 0;
+        this._customStt = {};
         this._geminiLiveModel = 'gemini-3.1-flash-live-preview';
         this._groqModel = 'qwen/qwen3.6-27b';
         this._groqImageModel = 'qwen/qwen3.6-27b';
@@ -780,7 +965,8 @@ export class MainView extends LitElement {
             this._openaiKey = creds.openaiKey || creds.openaiApiKey || '';
             this._openrouterKey = creds.openrouterKey || '';
             this._openaiModel = config.openaiModel || 'gpt-4o-mini';
-            this._openrouterModel = config.openrouterModel || 'openai/gpt-4o-mini';
+            this._openrouterModel = config.openrouterModel || 'openai/gpt-5.4-nano';
+            this._hostedModels = { ...config };
             this._geminiLiveModel = config.geminiLiveModel || 'gemini-3.1-flash-live-preview';
             this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
             this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
@@ -804,6 +990,15 @@ export class MainView extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        this._recordEpoch++;
+        clearTimeout(this._recordTimer);
+        this._recordStream?.getTracks().forEach(track => track.stop());
+        if (this._recorder?.state === 'recording') this._recorder.stop();
+        if (this._benchmarkBusy)
+            window
+                .require('electron')
+                .ipcRenderer.invoke('session:benchmark-cancel')
+                .catch(() => {});
         document.removeEventListener('keydown', this.boundKeydownHandler);
         if (this._animId) cancelAnimationFrame(this._animId);
     }
@@ -929,6 +1124,7 @@ export class MainView extends LitElement {
     // ── Persistence ──
 
     async _saveMode(mode) {
+        if (this._benchmarkBusy || this._recording || this._audioPending) return;
         this._mode = mode;
         this._tokenError = false;
         this._keyError = false;
@@ -1034,6 +1230,7 @@ export class MainView extends LitElement {
     // ── Start ──
 
     _handleStart() {
+        if (this._benchmarkBusy || this._recording || this._audioPending) return;
         if (this.isInitializing || this.downloadProgress.active) return;
 
         if (this._mode === 'byok') {
@@ -1120,7 +1317,7 @@ export class MainView extends LitElement {
         return html`
             <button
                 class="start-button ${this.isInitializing || isDownloading ? 'disabled' : ''}"
-                ?disabled=${this.isInitializing || isDownloading}
+                ?disabled=${this.isInitializing || isDownloading || this._benchmarkBusy || this._recording || this._audioPending}
                 @click=${() => this._handleStart()}
             >
                 <canvas class="btn-aurora"></canvas>
@@ -1266,6 +1463,7 @@ export class MainView extends LitElement {
 
     async _saveHostedField(field, value, credential = false) {
         this[`_${field}`] = value;
+        this._hostedModels = { ...this._hostedModels, [field]: value };
         this._keyError = false;
         const result = credential
             ? await cheatingDaddy.storage.setCredentials({ [field]: value.trim() })
@@ -1273,10 +1471,218 @@ export class MainView extends LitElement {
         if (!result.success) this._keyError = true;
     }
 
+    async recordBenchmark() {
+        if (this.isInitializing || this._benchmarkBusy) return;
+        if (this._recording) {
+            if (this._recorder?.state === 'recording') this._recorder.stop();
+            else {
+                this._recordEpoch++;
+                this._recording = false;
+            }
+            return;
+        }
+        const epoch = ++this._recordEpoch;
+        this._recorder = null;
+        this._recording = true;
+        this._recordedAudio = null;
+        this._benchmarkText = '';
+        this._benchmarkError = '';
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (epoch !== this._recordEpoch || !this.isConnected) {
+                stream.getTracks().forEach(t => t.stop());
+                return;
+            }
+            this._recordStream = stream;
+            const mimeType = ['audio/webm;codecs=opus', 'audio/mp4'].find(type => MediaRecorder.isTypeSupported(type));
+            if (!mimeType) throw Error('Запись аудио не поддерживается');
+            const recorder = (this._recorder = new MediaRecorder(stream, { mimeType }));
+            const chunks = [];
+            recorder.ondataavailable = e => {
+                if (e.data.size) chunks.push(e.data);
+            };
+            recorder.onstop = async () => {
+                clearTimeout(this._recordTimer);
+                stream.getTracks().forEach(t => t.stop());
+                this._recording = false;
+                if (epoch !== this._recordEpoch) return;
+                this._audioPending = true;
+                try {
+                    const blob = new Blob(chunks, { type: mimeType });
+                    if (!blob.size || blob.size > 8000000) throw Error('Запишите короткий вопрос');
+                    const data = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result.split(',')[1]);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    if (epoch === this._recordEpoch) this._recordedAudio = { audio: data, format: mimeType.includes('mp4') ? 'mp4' : 'webm' };
+                } catch (e) {
+                    this._benchmarkError = e.message || 'Не удалось сохранить запись';
+                } finally {
+                    this._audioPending = false;
+                }
+            };
+            recorder.onerror = () => {
+                this._benchmarkError = 'Не удалось записать голос';
+                stream.getTracks().forEach(t => t.stop());
+                this._recording = false;
+            };
+            recorder.start();
+            this._recordTimer = setTimeout(() => {
+                if (recorder.state === 'recording') recorder.stop();
+            }, 60000);
+        } catch (e) {
+            if (epoch !== this._recordEpoch) return;
+            this._recordStream?.getTracks().forEach(t => t.stop());
+            this._recording = false;
+            this._benchmarkError = e.message;
+        }
+    }
+
+    async addBenchmarkImage(event) {
+        const input = event.target;
+        const files = [...(input.files || [])];
+        try {
+            for (const file of files) {
+                if (this._benchmarkImages.length >= 4) throw Error('До 4 изображений');
+                if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10000000)
+                    throw Error('Выберите PNG, JPEG или WebP до 10 МБ');
+                const bitmap = await createImageBitmap(file);
+                const canvas = document.createElement('canvas');
+                const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#fff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                bitmap.close();
+                this._benchmarkImages = [...this._benchmarkImages, canvas.toDataURL('image/jpeg', 0.9).split(',')[1]];
+            }
+        } catch (e) {
+            this._benchmarkError = e.message;
+        }
+        input.value = '';
+    }
+
+    async runBenchmark() {
+        if (this.isInitializing || this._benchmarkBusy || this._recording || this._audioPending) return;
+        this._benchmarkBusy = true;
+        this._benchmarkResults = [];
+        this._benchmarkError = '';
+        const ipc = window.require('electron').ipcRenderer;
+        const receive = (_event, row) => {
+            this._benchmarkResults = [...this._benchmarkResults, row];
+        };
+        ipc.on('session:benchmark-result', receive);
+        try {
+            const result = await ipc.invoke('session:benchmark', {
+                provider: this._mode,
+                text: this._benchmarkText || '',
+                images: this._benchmarkImages,
+                ...this._recordedAudio,
+            });
+            if (!result.success) throw Error(result.error);
+            this._benchmarkResults = result.data;
+        } catch (e) {
+            this._benchmarkError = e.message;
+        } finally {
+            ipc.removeListener('session:benchmark-result', receive);
+            this._benchmarkBusy = false;
+        }
+    }
+
+    _renderBenchmark() {
+        return html`<button class="benchmark-toggle" @click=${() => (this._benchmarkOpen = !this._benchmarkOpen)}>Проверить скорость</button> ${
+                this._benchmarkOpen
+                    ? html`<div class="benchmark-panel">
+                          <textarea
+                              aria-label="Запрос для проверки скорости"
+                              placeholder="Ваш запрос"
+                              maxlength="1500"
+                              ?disabled=${this._benchmarkBusy || this._recording || this._audioPending}
+                              .value=${this._benchmarkText || ''}
+                              @input=${e => {
+                                  this._benchmarkText = e.target.value;
+                                  this._recordedAudio = null;
+                              }}
+                          ></textarea>
+                          <input
+                              id="benchmark-images"
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              multiple
+                              hidden
+                              @change=${this.addBenchmarkImage}
+                          />
+                          <div class="benchmark-actions">
+                              <button ?disabled=${this._benchmarkBusy} @click=${() => this.shadowRoot.querySelector('#benchmark-images').click()}>
+                                  Изображение +
+                              </button>
+                              ${this._benchmarkImages.map((image, index) => html`<button ?disabled=${this._benchmarkBusy} aria-label="Удалить изображение" @click=${() => (this._benchmarkImages = this._benchmarkImages.filter((_, i) => i !== index))}><img src=${'data:image/jpeg;base64,' + image} style="width:48px;height:36px;object-fit:contain" /> ×</button>`)}
+                              <button ?disabled=${this._benchmarkBusy || this._audioPending} @click=${this.recordBenchmark}>
+                                  ${this._recording ? 'Завершить запись' : this._recordedAudio ? 'Перезаписать' : 'Записать голос'}
+                              </button>
+                              ${this._recordedAudio ? html`<button ?disabled=${this._benchmarkBusy} aria-label="Удалить запись" @click=${() => (this._recordedAudio = null)}>×</button>` : ''}
+                              <button
+                                  ?disabled=${this._benchmarkBusy || this._recording || this._audioPending || (!this._benchmarkText?.trim() && !this._recordedAudio && !this._benchmarkImages.length)}
+                                  @click=${this.runBenchmark}
+                              >
+                                  Проверить
+                              </button>
+                              ${this._benchmarkBusy ? html`<button @click=${() => window.require('electron').ipcRenderer.invoke('session:benchmark-cancel')}>Отмена</button>` : ''}
+                          </div>
+                          <div class="form-hint">Полный ответ · платные API-запросы.</div>
+                          ${this._benchmarkResults.map(
+                              row =>
+                                  html`<details class="benchmark-result">
+                                      <summary>${row.role}<strong>${row.ok ? `${row.seconds} с` : 'Ошибка'}</strong></summary>
+                                      <div class="form-hint">${row.model}</div>
+                                      <pre>${row.text || row.error}</pre>
+                                  </details>`
+                          )}
+                          ${this._benchmarkBusy ? html`<div role="status">Проверка…</div>` : ''}
+                          ${this._benchmarkError ? html`<div role="alert">${this._benchmarkError}</div>` : ''}
+                      </div>`
+                    : ''
+            }`;
+    }
+
     _renderHostedMode() {
         const router = this._mode === 'openrouter';
         const keyField = router ? 'openrouterKey' : 'openaiKey';
         const modelField = router ? 'openrouterModel' : 'openaiModel';
+        const customResponse = router && (this._customRouterModel || !OPENROUTER_RESPONSE_MODELS.some(model => model.id === this._openrouterModel));
+        const prefix = router ? 'openrouter' : 'openai';
+        const imageModels = router
+            ? [...OPENROUTER_RESPONSE_MODELS.map(model => model.id), 'openai/gpt-4o-mini', 'google/gemini-2.5-flash-lite']
+            : ['gpt-5.4-nano', 'gpt-4o-mini', 'gpt-4.1-mini'];
+        const fields = [
+            {
+                suffix: 'TranscriptionModel',
+                label: 'Speech to text',
+                fallback: router ? 'openai/whisper-1' : 'whisper-1',
+                choices: router
+                    ? ['openai/gpt-4o-mini-transcribe', 'openai/whisper-1', 'openai/whisper-large-v3']
+                    : ['gpt-4o-mini-transcribe-2025-12-15', 'whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'],
+                hint: 'Модель для /audio/transcriptions. Обычная чат-модель не подойдёт.',
+            },
+            {
+                suffix: 'OcrModel',
+                label: 'Распознавание текста',
+                fallback: router ? 'google/gemini-2.5-flash-lite' : 'gpt-4o-mini',
+                choices: imageModels,
+                hint: 'Режим «Распознать текст»: эта модель извлекает текст, модель ответа решает задачу.',
+            },
+            {
+                suffix: 'VisionModel',
+                label: 'Vision · анализ изображений',
+                fallback: '',
+                choices: imageModels,
+                hint: 'Режим «Анализ изображения»: эта модель получает скриншот целиком и отвечает на вопрос.',
+            },
+        ];
         return html`
             <div class="config-section">
                 <div class="config-content">
@@ -1293,29 +1699,131 @@ export class MainView extends LitElement {
                         />
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="hosted-model">OpenAI response model</label>
-                        <input
-                            id="hosted-model"
-                            type="text"
-                            .value=${this[`_${modelField}`]}
-                            placeholder=${router ? 'openai/gpt-4o-mini' : 'gpt-4o-mini'}
-                            @input=${e => this._saveHostedField(modelField, e.target.value)}
-                        />
+                        <label class="form-label" for=${router ? undefined : 'hosted-model'}>Response model · ответы</label>
+                        ${
+                            router
+                                ? html`<div class="model-cards" role="group" aria-label="Модель ответа OpenRouter">
+                                          ${OPENROUTER_RESPONSE_MODELS.map(
+                                              model =>
+                                                  html`<button
+                                                      type="button"
+                                                      class="model-card"
+                                                      data-model=${model.id}
+                                                      aria-pressed=${!customResponse && this._openrouterModel === model.id}
+                                                      @click=${() => {
+                                                          this._customRouterModel = false;
+                                                          this._saveHostedField(modelField, model.id);
+                                                      }}
+                                                  >
+                                                      <span class="model-card-head"
+                                                          ><span>${model.label}</span><span class="model-radio" aria-hidden="true"></span
+                                                      ></span>
+                                                      <span class="model-metrics"
+                                                          >${[
+                                                              ['Speed', model.speed],
+                                                              ['Reasoning', model.reasoning],
+                                                          ].map(
+                                                              ([label, score]) =>
+                                                                  html` <span class="model-metric"
+                                                                      ><span class="model-metric-label"
+                                                                          ><span>${label}</span><span>${score}/5</span></span
+                                                                      >
+                                                                      <span class="model-meter" aria-hidden="true"
+                                                                          >${[1, 2, 3, 4, 5].map(i => html`<i class=${i <= score ? 'filled' : ''}></i>`)}</span
+                                                                      ></span
+                                                                  >`
+                                                          )}</span
+                                                      >
+                                                      <span class="model-price"
+                                                          ><span>Input <strong>$${model.input}</strong></span
+                                                          ><span>Output <strong>$${model.output}</strong></span></span
+                                                      >
+                                                  </button>`
+                                          )}
+                                          <button
+                                              type="button"
+                                              class="custom-model"
+                                              aria-pressed=${!!customResponse}
+                                              @click=${() => {
+                                                  this._customRouterModel = true;
+                                              }}
+                                          >
+                                              Другая модель…
+                                          </button>
+                                      </div>
+                                      <div class="model-price-unit">
+                                          USD за 1 млн токенов · без кеша<br />Speed / Reasoning — условные оценки, не замеры.
+                                      </div>`
+                                : ''
+                        }
+                        ${
+                            !router || customResponse
+                                ? html`<input
+                                      id="hosted-model"
+                                      aria-label="Model ID"
+                                      type="text"
+                                      list="hosted-response-models"
+                                      .value=${this[`_${modelField}`]}
+                                      placeholder=${router ? 'openai/model-id' : 'gpt-4o-mini'}
+                                      @input=${e => this._saveHostedField(modelField, e.target.value)}
+                                  />`
+                                : ''
+                        }
+                        <datalist id="hosted-response-models">
+                            ${(router ? OPENROUTER_RESPONSE_MODELS.map(model => model.id) : ['gpt-4o-mini', 'gpt-5.4-nano']).map(id => html`<option value=${id}></option>`)}
+                        </datalist>
                         <div class="form-hint">
-                            ${router ? 'Use an openai/ model ID from OpenRouter.' : 'Use an OpenAI model that supports Chat Completions and images.'}
+                            ${router ? 'Use an openai/ model ID from OpenRouter.' : 'Use an OpenAI model that supports Chat Completions.'}
                         </div>
                     </div>
+                    ${fields.map(({ suffix, label, fallback, choices, hint }) => {
+                        const field = `${prefix}${suffix}`;
+                        const stt = suffix === 'TranscriptionModel';
+                        const value = this._hostedModels[field] ?? fallback;
+                        const customStt = stt && (this._customStt[prefix] || !choices.includes(value));
+                        return html`<div class="form-group">
+                            <label class="form-label" for=${stt ? `${field}-select` : field}>${label}</label>
+                            ${
+                                stt
+                                    ? html`<select
+                                          id=${`${field}-select`}
+                                          .value=${customStt ? 'custom' : value}
+                                          @change=${e => {
+                                              this._customStt = { ...this._customStt, [prefix]: e.target.value === 'custom' };
+                                              if (e.target.value !== 'custom') this._saveHostedField(field, e.target.value);
+                                          }}
+                                      >
+                                          ${choices.map(id => html`<option value=${id}>${id}</option>`)}
+                                          <option disabled>GPT Realtime Whisper · нужен Realtime-режим</option>
+                                          <option value="custom">Другая модель…</option>
+                                      </select>`
+                                    : ''
+                            }
+                            ${
+                                !stt || customStt
+                                    ? html`
+                                          <input
+                                              id=${field}
+                                              type="text"
+                                              list=${`${field}-choices`}
+                                              .value=${this._hostedModels[field] ?? fallback}
+                                              placeholder=${suffix === 'VisionModel' ? 'Как модель ответа' : fallback}
+                                              @input=${e => this._saveHostedField(field, e.target.value)}
+                                          />
+                                      `
+                                    : ''
+                            }
+                            <datalist id=${`${field}-choices`}>${choices.map(id => html`<option value=${id}></option>`)}</datalist>
+                            <div class="form-hint">${hint}</div>
+                        </div>`;
+                    })}
                     <div class="form-hint">
-                        Speech is transcribed by Whisper through ${router ? 'OpenRouter' : 'OpenAI'} using this key. Audio and manual screenshots are
-                        sent to the selected service. API usage is billed separately from ChatGPT.
-                    </div>
-                    <div class="form-hint">
-                        New answers wait while you read. Use the arrows to move to the next answer. Pause stops audio only. Text questions and Analyze
-                        Screen stay available.
+                        Выберите подсказку или введите свой ID модели. Распознавание текста и анализ изображений требуют поддержки изображений.
+                        Настройки сохраняются автоматически и применяются в новой сессии. API оплачивается отдельно.
                     </div>
                 </div>
             </div>
-            ${this._renderStartButton()}
+            ${this._renderBenchmark()} ${this._renderStartButton()}
         `;
     }
 

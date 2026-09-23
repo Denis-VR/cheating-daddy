@@ -244,3 +244,45 @@ test('OpenRouter uses cheap OCR first and sends only extracted text to the answe
     assert.ok(!JSON.stringify(requests[1]).includes('data:image'));
     assert.match(events.filter(e => e[0] === 'update-response').at(-1)[1].text, /Invoice 12345[\s\S]*250 USD/);
 });
+
+for (const provider of ['openai', 'openrouter']) {
+    test(`${provider}: independent STT, OCR and vision models route requests without changing text model`, async () => {
+        const requests = [];
+        const prefix = provider === 'openrouter' ? 'openai/' : '';
+        const s = session({
+            provider,
+            model: `${prefix}text-model`,
+            transcriptionModel: `${prefix}gpt-4o-mini-transcribe`,
+            ocrModel: provider === 'openrouter' ? 'google/custom-ocr' : 'custom-ocr',
+            visionModel: `${prefix}custom-vision`,
+            fetchImpl: async (url, init) => {
+                const body = init.body instanceof FormData ? Object.fromEntries(init.body) : JSON.parse(init.body);
+                requests.push({ url, body });
+                return url.endsWith('/audio/transcriptions')
+                    ? { ok: true, json: async () => ({ text: 'transcribed question' }) }
+                    : { ok: true, body: stream([completion('result')]) };
+            },
+        });
+        await s.enqueue({ pcm: tone(25) });
+        const ocr = await s.enqueue({ image: 'aGVsbG8=', text: 'read', imageMode: 'ocr' });
+        const vision = await s.enqueue({ image: 'aGVsbG8=', text: 'diagram', imageMode: 'vision' });
+        await s.enqueue({ text: 'follow up' });
+        assert.deepEqual(
+            requests.map(r => r.body.model),
+            [s.transcriptionModel, s.model, s.ocrModel, s.model, s.visionModel, s.model]
+        );
+        assert.equal(requests[0].body.response_format, 'json');
+        assert.equal(typeof requests[3].body.messages.at(-1).content, 'string');
+        assert.ok(Array.isArray(requests[4].body.messages.at(-1).content));
+        assert.equal(ocr.model, s.model);
+        assert.equal(vision.model, s.visionModel);
+    });
+}
+
+test('optional model IDs are validated and vision defaults to response model', () => {
+    assert.equal(session().visionModel, 'openai/gpt-4o-mini');
+    for (const field of ['transcriptionModel', 'ocrModel', 'visionModel']) {
+        assert.throws(() => session({ [field]: 'bad\nmodel' }), /Invalid .* model ID/);
+        assert.throws(() => session({ [field]: 'missing-provider' }), /Invalid .* model ID/);
+    }
+});

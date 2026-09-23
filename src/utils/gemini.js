@@ -1095,7 +1095,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 provider,
                 key: credentials[PROVIDERS[provider].keyField] || (provider === 'openai' ? credentials.openaiApiKey : ''),
                 model: config[`${provider}Model`] || PROVIDERS[provider].model,
-                systemPrompt: `${getSystemPrompt(profile, customPrompt, false)}\nRespond in ${language}. Use valid GitHub-flavored Markdown tables when the user asks for a table or a comparison benefits from one. Do not wrap tables in code fences.`,
+                transcriptionModel: config[`${provider}TranscriptionModel`],
+                ocrModel: config[`${provider}OcrModel`],
+                visionModel: config[`${provider}VisionModel`],
+                systemPrompt: require('./prompts').getHostedSystemPrompt(profile, customPrompt, language),
                 language,
                 reviewAudio: true,
                 preparation: (() => {

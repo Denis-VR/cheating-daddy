@@ -633,22 +633,25 @@ export class CheatingDaddyApp extends LitElement {
         }
         this.requestUpdate();
     }
-    mergeTopic() {
-        const source = this.currentResponseIndex;
-        let target = source - 1;
-        while (target >= 0 && this.topicMeta[target]?.hidden) target--;
-        if (target < 0) return;
-        this._baseResponses.set(target, [this._baseResponses.get(target), this._baseResponses.get(source)].filter(Boolean).join('\n\n---\n\n'));
-        for (const request of this._inlineRequests.values()) if (request.index === source) request.index = target;
-        for (const [id, index] of this._responseIds) if (index === source) this._responseIds.set(id, target);
-        this.editTopic(source, { hidden: true });
+    mergeTopic(indices = []) {
+        const selected = [...new Set(indices)]
+            .filter(i => Number.isInteger(i) && this.topicMeta[i] && !this.topicMeta[i].hidden)
+            .sort((a, b) => a - b);
+        if (selected.length < 2) return;
+        const [target, ...sources] = selected;
+        for (const source of sources) {
+            this._baseResponses.set(target, [this._baseResponses.get(target), this._baseResponses.get(source)].filter(Boolean).join('\n\n---\n\n'));
+            for (const request of this._inlineRequests.values()) if (request.index === source) request.index = target;
+            for (const [id, index] of this._responseIds) if (index === source) this._responseIds.set(id, target);
+            this.editTopic(source, { hidden: true });
+        }
         this.currentResponseIndex = target;
         this._renderResponse(target);
     }
-    splitTopic() {
-        const source = this.currentResponseIndex;
-        const entry = [...this._inlineRequests.values()].filter(r => r.index === source).at(-1);
-        if (!entry) return;
+    splitTopic(requestId) {
+        const entry = this._inlineRequests.get(requestId);
+        if (!entry || this.topicMeta[entry.index]?.hidden) return;
+        const source = entry.index;
         this.openResponseCard();
         entry.index = this.currentResponseIndex;
         this.editTopic(this.currentResponseIndex, { title: entry.question.slice(0, 80), question: entry.question });
