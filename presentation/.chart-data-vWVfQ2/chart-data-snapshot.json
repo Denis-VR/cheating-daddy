@@ -1,0 +1,32 @@
+{
+  "conversion": "chart_data_snapshot",
+  "converted_chart_count": 1,
+  "converted_charts": [
+    {
+      "chart_part": "ppt/slides/charts/chart1.xml",
+      "owner_slide": 15,
+      "point_count": 4,
+      "series_count": 1,
+      "workbook_part": "ppt/embeddings/chart-data-snapshot-001.xlsx"
+    }
+  ],
+  "detected_chart_owner_slides": [
+    15
+  ],
+  "experimental": true,
+  "input_sha256": "f07ff7250c1986666469bd77f7fc54338310c7d64c06db669e2bd511132e47c0",
+  "new_formulas_describe_snapshot_only": true,
+  "output_bytes": 1490122,
+  "output_sha256": "fe2b5cc9cd6bd3beadca2f31d3fb2e6d56e89ca7f5a7431d8a6ea152318d9ef6",
+  "portable_chart_validation_passed": true,
+  "portable_validated_owner_slides": [
+    15
+  ],
+  "preserved_existing_workbook_chart_count": 0,
+  "preserved_existing_workbook_charts": [],
+  "schema_version": "experimental.literal-chart-workbook-snapshot.v1",
+  "source_formula_required_slides": [],
+  "source_formulas_preserved": false,
+  "source_workbook_preserved": false,
+  "source_workbook_required_slides": []
+}

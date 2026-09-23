@@ -1,0 +1,211 @@
+{"kind":"deck","id":"pr/fwaw15","name":"Deck"}
+{"kind":"layout","layoutId":"a7655aeb-3d4b-418f-aac0-de5556c443f3","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"5a148141-c5a9-4638-bd76-7ce24a80a624","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/vtw303","slide":1,"title":"01","textShapes":5}
+{"kind":"textbox","id":"sh/xg7uxwji","slide":1,"name":"text-vtw303-0.8127693442517064","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/bepcvm1s","slide":1,"name":"text-vtw303-1","text":"AI-АССИСТЕНТ ДЛЯ ТЕХНИЧЕСКИХ РАЗГОВОРОВ","textPreview":"AI-АССИСТЕНТ ДЛЯ ТЕХНИЧЕСКИХ РАЗГОВОРОВ","textChars":39,"textLines":1,"bbox":[64,66,750,32]}
+{"kind":"textbox","id":"sh/kjidsri9","slide":1,"name":"text-vtw303-2","text":"Cheating\nDaddy","textPreview":"Cheating | Daddy","textChars":14,"textLines":2,"bbox":[64,210,700,216]}
+{"kind":"textbox","id":"sh/lkru1wju","slide":1,"name":"text-vtw303-3","text":"Вопросы, контекст и ответы\nв удобном темпе разговора","textPreview":"Вопросы, контекст и ответы | в удобном темпе разговора","textChars":52,"textLines":2,"bbox":[68,483,640,112]}
+{"kind":"textbox","id":"sh/yhgvq103","slide":1,"name":"text-vtw303-4","text":"Обзор возможностей приложения","textPreview":"Обзор возможностей приложения","textChars":29,"textLines":1,"bbox":[68,649,700,32]}
+{"kind":"image","id":"im/n2x8nehc","slide":1,"name":"","bbox":[0,0,1280,720]}
+{"kind":"notes","id":"nt/vtw303","slide":1,"text":"Обложка: оригинальная декоративная иллюстрация, созданная с Imagegen. Обзор текущей версии локального приложения."}
+{"kind":"slide","id":"sl/qgwv2v","slide":2,"title":"Ответ остаётся перед глазами","textShapes":11}
+{"kind":"textbox","id":"sh/9cb25cvi","slide":2,"name":"text-qgwv2v-0.6913310136305888","text":"Ответ остаётся перед глазами","textPreview":"Ответ остаётся перед глазами","textChars":28,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/m9kjuxcr","slide":2,"name":"text-qgwv2v-1","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/natk32dc","slide":2,"name":"text-qgwv2v-2","text":"Собеседник продолжает говорить.\nВы спокойно дочитываете текущий ответ.","textPreview":"Собеседник продолжает говорить. | Вы спокойно дочитываете текущий ответ.","textChars":70,"textLines":2,"bbox":[64,169,1050,88]}
+{"kind":"textbox","id":"sh/0721snul","slide":2,"name":"text-qgwv2v-3","text":"РАЗГОВОР","textPreview":"РАЗГОВОР","textChars":8,"textLines":1,"bbox":[64,301,190,32]}
+{"kind":"textbox","id":"sh/l8b21sv6","slide":2,"name":"text-qgwv2v-4","text":"ВАШ ЭКРАН","textPreview":"ВАШ ЭКРАН","textChars":9,"textLines":1,"bbox":[64,456,190,32]}
+{"kind":"textbox","id":"sh/y50jqxcv","slide":2,"text":"Вопрос про Go","textPreview":"Вопрос про Go","textChars":13,"textLines":1,"bbox":[277,290,264,75]}
+{"kind":"textbox","id":"sh/z6tkz2d0","slide":2,"text":"Уточнение","textPreview":"Уточнение","textChars":9,"textLines":1,"bbox":[591,290,264,75]}
+{"kind":"textbox","id":"sh/c3i1onup","slide":2,"text":"Вопрос про Kafka","textPreview":"Вопрос про Kafka","textChars":16,"textLines":1,"bbox":[905,290,300,75]}
+{"kind":"shape","id":"sh/d4r2xsva","slide":2,"bbox":[541,327.5,50,0]}
+{"kind":"shape","id":"sh/dw32x8ny","slide":2,"bbox":[855,327.5,50,0]}
+{"kind":"textbox","id":"sh/svu1o3md","slide":2,"text":"Текущий ответ остаётся выбранным","textPreview":"Текущий ответ остаётся выбранным","textChars":32,"textLines":1,"bbox":[277,440,578,95]}
+{"kind":"textbox","id":"sh/rul0vy58","slide":2,"text":"Новые вопросы\nждут в очереди","textPreview":"Новые вопросы | ждут в очереди","textChars":28,"textLines":2,"bbox":[905,440,300,95]}
+{"kind":"shape","id":"sh/qtcjmt4n","slide":2,"bbox":[855,487.5,50,0]}
+{"kind":"textbox","id":"sh/5s3iton2","slide":2,"name":"text-qgwv2v-13","text":"Пауза останавливает обработку нового аудио. Текстовые вопросы и скриншоты остаются доступны.","textPreview":"Пауза останавливает обработку нового аудио. Текстовые вопросы и скриншоты остаются доступны.","textChars":92,"textLines":1,"bbox":[277,566,900,75]}
+{"kind":"notes","id":"nt/qgwv2v","slide":2,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/components/app/CheatingDaddyApp.js; src/components/views/AssistantView.js. Схема иллюстрирует поведение интерфейса, а не измерение времени."}
+{"kind":"slide","id":"sl/ok8rzg","slide":3,"title":"Один рабочий цикл","textShapes":11}
+{"kind":"textbox","id":"sh/jqporaxk","slide":3,"name":"text-ok8rzg-0.6459898194672905","text":"Один рабочий цикл","textPreview":"Один рабочий цикл","textChars":17,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/krypkfyp","slide":3,"name":"text-ok8rzg-1","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/lc76tkfa","slide":3,"name":"text-ok8rzg-2","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[64,230,250,120]}
+{"kind":"textbox","id":"sh/6dg7m5gv","slide":3,"name":"text-ok8rzg-3","text":"До разговора","textPreview":"До разговора","textChars":12,"textLines":1,"bbox":[64,370,330,50]}
+{"kind":"textbox","id":"sh/7epovaxg","slide":3,"name":"text-ok8rzg-4","text":"Материалы вакансии\nПрофиль инструкций\nПроверка готовности","textPreview":"Материалы вакансии | Профиль инструкций | Проверка готовности","textChars":57,"textLines":3,"bbox":[64,447,340,158]}
+{"kind":"textbox","id":"sh/sfypofy1","slide":3,"name":"text-ok8rzg-5","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[480,230,250,120]}
+{"kind":"textbox","id":"sh/tg7qxkfm","slide":3,"name":"text-ok8rzg-6","text":"Во время","textPreview":"Во время","textChars":8,"textLines":1,"bbox":[480,370,330,50]}
+{"kind":"textbox","id":"sh/mhc7algr","slide":3,"name":"text-ok8rzg-7","text":"Распознанные вопросы\nОтветы и уточнения\nКод, скриншоты и схемы","textPreview":"Распознанные вопросы | Ответы и уточнения | Код, скриншоты и схемы","textChars":62,"textLines":3,"bbox":[480,447,340,158]}
+{"kind":"textbox","id":"sh/ni5ojqhc","slide":3,"name":"text-ok8rzg-8","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[896,230,250,120]}
+{"kind":"textbox","id":"sh/zqlkj6h0","slide":3,"name":"text-ok8rzg-9","text":"После","textPreview":"После","textChars":5,"textLines":1,"bbox":[896,370,330,50]}
+{"kind":"textbox","id":"sh/ypc3a1gf","slide":3,"name":"text-ok8rzg-10","text":"Сохранённая история\nТемы для перепроверки\nПлан повторения","textPreview":"Сохранённая история | Темы для перепроверки | План повторения","textChars":57,"textLines":3,"bbox":[896,447,340,158]}
+{"kind":"notes","id":"nt/ok8rzg","slide":3,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/components/views/InterviewTools.js; src/components/views/SessionConsole.js; src/components/views/HistoryView.js. "}
+{"kind":"slide","id":"sl/urvxyh","slide":4,"title":"Из реплик получается вопрос","textShapes":8}
+{"kind":"textbox","id":"sh/694zyl0b","slide":4,"name":"text-urvxyh-0.6022611228789465","text":"Из реплик получается вопрос","textPreview":"Из реплик получается вопрос","textChars":27,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/tcvyt0jm","slide":4,"name":"text-urvxyh-1","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/sbmh0vih","slide":4,"text":"«Расскажи про индексы…»","textPreview":"«Расскажи про индексы…»","textChars":23,"textLines":1,"bbox":[64,203,480,84]}
+{"kind":"textbox","id":"sh/fedgva1s","slide":4,"text":"«…и почему PostgreSQL\nиногда их не использует?»","textPreview":"«…и почему PostgreSQL | иногда их не использует?»","textChars":47,"textLines":2,"bbox":[64,331,480,104]}
+{"kind":"textbox","id":"sh/ud4z2507","slide":4,"text":"Один редактируемый вопрос","textPreview":"Один редактируемый вопрос","textChars":25,"textLines":1,"bbox":[650,266,550,109]}
+{"kind":"shape","id":"sh/h0fix0jy","slide":4,"bbox":[544,245,106,75.5]}
+{"kind":"shape","id":"sh/gzmh4vid","slide":4,"bbox":[544,320.5,106,62.5]}
+{"kind":"textbox","id":"sh/vitgj61o","slide":4,"name":"text-urvxyh-7","text":"Связанные реплики собираются вместе.\nКороткие подтверждения вроде «угу»\nи «понятно» не запускают ответ.","textPreview":"Связанные реплики собираются вместе. | Короткие подтверждения вроде «угу» | и «понятно» не запускают ответ.","textChars":103,"textLines":3,"bbox":[64,491,523,123]}
+{"kind":"textbox","id":"sh/ahkzq103","slide":4,"name":"text-urvxyh-8","text":"Вы выбираете момент ответа","textPreview":"Вы выбираете момент ответа","textChars":26,"textLines":1,"bbox":[650,460,550,46]}
+{"kind":"textbox","id":"sh/sri58zah","slide":4,"name":"text-urvxyh-9","text":"Проверьте формулировку, поправьте текст\nи подтвердите отправку модели.","textPreview":"Проверьте формулировку, поправьте текст | и подтвердите отправку модели.","textChars":70,"textLines":2,"bbox":[650,521,550,100]}
+{"kind":"notes","id":"nt/urvxyh","slide":4,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/utils/interview-workflow.js; src/components/views/InterviewTools.js. Объединение реплик использует эвристики и временное окно. Пользователь проверяет и исправляет черновик."}
+{"kind":"slide","id":"sl/1detzh","slide":5,"title":"Интерфейс для чтения","textShapes":7}
+{"kind":"textbox","id":"sh/c3apsve9","slide":5,"name":"text-1detzh-0.5537189063052194","text":"Интерфейс для чтения","textPreview":"Интерфейс для чтения","textChars":20,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/r21ozqdo","slide":5,"name":"text-1detzh-1","text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/1sj65kvq","slide":5,"name":"text-1detzh-2","text":"Крупный ответ","textPreview":"Крупный ответ","textChars":13,"textLines":1,"bbox":[854,196,350,48]}
+{"kind":"textbox","id":"sh/0rapwfe5","slide":5,"name":"text-1detzh-3","text":"Режим «Только ответ»\nскрывает служебные панели.","textPreview":"Режим «Только ответ» | скрывает служебные панели.","textChars":47,"textLines":2,"bbox":[854,254,353,90]}
+{"kind":"textbox","id":"sh/z61o3adk","slide":5,"name":"text-1detzh-4","text":"Текст под вас","textPreview":"Текст под вас","textChars":13,"textLines":1,"bbox":[854,378,350,48]}
+{"kind":"textbox","id":"sh/e5s7u5wz","slide":5,"name":"text-1detzh-5","text":"A− и A+ меняют шрифт.\nКод получает подсветку,\nтаблицы сохраняют структуру.\nЕсть горячие клавиши.","textPreview":"A− и A+ меняют шрифт. | Код получает подсветку, | таблицы сохраняют структуру. | Есть горячие клавиши.","textChars":96,"textLines":4,"bbox":[854,435,353,169]}
+{"kind":"textbox","id":"sh/hwz6tgfm","slide":5,"name":"text-1detzh-6","text":"Интерфейс с демонстрационным ответом","textPreview":"Интерфейс с демонстрационным ответом","textChars":36,"textLines":1,"bbox":[64,651,700,28]}
+{"kind":"image","id":"im/jyl4bqdo","slide":5,"name":"","bbox":[64,180,745,482]}
+{"kind":"notes","id":"nt/1detzh","slide":5,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/components/views/AssistantView.js. Снимок реального компонента приложения в браузерном стенде. Демонстрационный текст ответа, не реальный диалог пользователя."}
+{"kind":"slide","id":"sl/xapiq1","slide":6,"title":"Глубина ответа под ситуацию","textShapes":13}
+{"kind":"textbox","id":"sh/ofy1c3i9","slide":6,"name":"text-xapiq1-0.9961332632256821","text":"Глубина ответа под ситуацию","textPreview":"Глубина ответа под ситуацию","textChars":27,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/nep03yho","slide":6,"name":"text-xapiq1-1","text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/2dgjat03","slide":6,"name":"text-xapiq1-2","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[64,206,94,58]}
+{"kind":"textbox","id":"sh/x4ri9szq","slide":6,"name":"text-xapiq1-3","text":"Короткий ответ","textPreview":"Короткий ответ","textChars":14,"textLines":1,"bbox":[198,206,400,49]}
+{"kind":"textbox","id":"sh/cji1gni5","slide":6,"name":"text-xapiq1-4","text":"Главная мысль в нескольких предложениях.","textPreview":"Главная мысль в нескольких предложениях.","textChars":40,"textLines":1,"bbox":[645,210,570,92]}
+{"kind":"textbox","id":"sh/bi907ihk","slide":6,"name":"text-xapiq1-5","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[64,325,94,58]}
+{"kind":"textbox","id":"sh/ah0jed0z","slide":6,"name":"text-xapiq1-6","text":"Объяснение","textPreview":"Объяснение","textChars":10,"textLines":1,"bbox":[198,325,400,49]}
+{"kind":"textbox","id":"sh/l8bidszm","slide":6,"name":"text-xapiq1-7","text":"Логика решения, отличия и важные условия.","textPreview":"Логика решения, отличия и важные условия.","textChars":41,"textLines":1,"bbox":[645,329,570,92]}
+{"kind":"textbox","id":"sh/k7i1kni1","slide":6,"name":"text-xapiq1-8","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[64,444,94,58]}
+{"kind":"textbox","id":"sh/adgj2po3","slide":6,"name":"text-xapiq1-9","text":"Подробности","textPreview":"Подробности","textChars":11,"textLines":1,"bbox":[198,444,400,49]}
+{"kind":"textbox","id":"sh/vep0vu5o","slide":6,"name":"text-xapiq1-10","text":"Пример, ограничения и детали реализации.","textPreview":"Пример, ограничения и детали реализации.","textChars":40,"textLines":1,"bbox":[645,448,570,92]}
+{"kind":"textbox","id":"sh/wfy14z69","slide":6,"name":"text-xapiq1-11","text":"БЫСТРЫЕ УТОЧНЕНИЯ","textPreview":"БЫСТРЫЕ УТОЧНЕНИЯ","textChars":17,"textLines":1,"bbox":[64,594,560,32]}
+{"kind":"textbox","id":"sh/xg7ix4nu","slide":6,"name":"text-xapiq1-12","text":"«Короче»     «Пример на Go»     «Почему?»     «Сравнить»","textPreview":"«Короче»     «Пример на Go»     «Почему?»     «Сравнить»","textChars":56,"textLines":1,"bbox":[64,638,1147,43]}
+{"kind":"notes","id":"nt/xapiq1","slide":6,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/utils/interview-workflow.js; src/components/views/InterviewTools.js. Формат задаётся инструкцией модели. Пример ниже объясняет структуру, а не является снимком интерфейса."}
+{"kind":"slide","id":"sl/hmruyn","slide":7,"title":"Уточнения сохраняют тему","textShapes":8}
+{"kind":"textbox","id":"sh/p0jql8be","slide":7,"name":"text-hmruyn-0.9971636708874348","text":"Уточнения сохраняют тему","textPreview":"Уточнения сохраняют тему","textChars":24,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/2dsrqtsn","slide":7,"name":"text-hmruyn-1","text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/ne18jyt8","slide":7,"text":"Каналы Go","textPreview":"Каналы Go","textChars":9,"textLines":1,"bbox":[64,237,290,94]}
+{"kind":"textbox","id":"sh/0ba9ojax","slide":7,"text":"«А если канал закрыт?»","textPreview":"«А если канал закрыт?»","textChars":22,"textLines":1,"bbox":[466,201,734,85]}
+{"kind":"textbox","id":"sh/1cjqhobi","slide":7,"text":"«Почему отправка блокируется?»","textPreview":"«Почему отправка блокируется?»","textChars":30,"textLines":1,"bbox":[466,330,734,85]}
+{"kind":"shape","id":"sh/e98rmtsr","slide":7,"bbox":[354,243.5,112,40.5]}
+{"kind":"shape","id":"sh/fa18fetc","slide":7,"bbox":[354,284,112,88.5]}
+{"kind":"textbox","id":"sh/k7u90na1","slide":7,"text":"Kafka","textPreview":"Kafka","textChars":5,"textLines":1,"bbox":[64,506,290,94]}
+{"kind":"textbox","id":"sh/l83atsrm","slide":7,"text":"Отдельная тема и свои уточнения","textPreview":"Отдельная тема и свои уточнения","textChars":31,"textLines":1,"bbox":[466,506,734,94]}
+{"kind":"shape","id":"sh/5sn6p4v2","slide":7,"bbox":[354,553,112,0]}
+{"kind":"textbox","id":"sh/4re5gzuh","slide":7,"name":"text-hmruyn-10","text":"Темы можно объединять, разделять и удалять. Для отдельного запроса есть новая карточка.","textPreview":"Темы можно объединять, разделять и удалять. Для отдельного запроса есть новая карточка.","textChars":87,"textLines":1,"bbox":[64,626,1080,65]}
+{"kind":"notes","id":"nt/hmruyn","slide":7,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/components/app/CheatingDaddyApp.js; src/components/views/InterviewTools.js. Автоматическую маршрутизацию можно исправить вручную."}
+{"kind":"slide","id":"sl/eebsfh","slide":8,"title":"Ответы с учётом вашего опыта","textShapes":12}
+{"kind":"textbox","id":"sh/vypw7210","slide":8,"name":"text-eebsfh-0.7566809451734808","text":"Ответы с учётом вашего опыта","textPreview":"Ответы с учётом вашего опыта","textChars":28,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/wzyd072l","slide":8,"name":"text-eebsfh-1","text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/x0re9cj6","slide":8,"name":"text-eebsfh-2","text":"PREPARATION","textPreview":"PREPARATION","textChars":11,"textLines":1,"bbox":[64,188,500,32]}
+{"kind":"textbox","id":"sh/m9gvuxkj","slide":8,"name":"text-eebsfh-3","text":"Ваши материалы","textPreview":"Ваши материалы","textChars":14,"textLines":1,"bbox":[64,229,505,58]}
+{"kind":"textbox","id":"sh/napw321o","slide":8,"name":"text-eebsfh-4","text":"Резюме, описание вакансии\nи реальные истории проектов.\nИмпорт PDF с текстом, DOCX, TXT, MD.","textPreview":"Резюме, описание вакансии | и реальные истории проектов. | Импорт PDF с текстом, DOCX, TXT, MD.","textChars":91,"textLines":3,"bbox":[64,301,521,140]}
+{"kind":"textbox","id":"sh/8bydw729","slide":8,"name":"text-eebsfh-5","text":"AI CUSTOMIZATION","textPreview":"AI CUSTOMIZATION","textChars":16,"textLines":1,"bbox":[696,188,500,32]}
+{"kind":"textbox","id":"sh/9w7e5cju","slide":8,"name":"text-eebsfh-6","text":"Ваши инструкции","textPreview":"Ваши инструкции","textChars":15,"textLines":1,"bbox":[696,229,520,58]}
+{"kind":"textbox","id":"sh/650f6h0n","slide":8,"name":"text-eebsfh-7","text":"Создание, редактирование\nи удаление профилей.\nСтиль и глубина ответа под задачу.","textPreview":"Создание, редактирование | и удаление профилей. | Стиль и глубина ответа под задачу.","textChars":80,"textLines":3,"bbox":[696,301,520,140]}
+{"kind":"textbox","id":"sh/769wfm18","slide":8,"text":"Релевантные фрагменты опыта","textPreview":"Релевантные фрагменты опыта","textChars":27,"textLines":1,"bbox":[64,480,521,85]}
+{"kind":"textbox","id":"sh/bmtcz6l0","slide":8,"text":"Профиль и дополнительные инструкции","textPreview":"Профиль и дополнительные инструкции","textChars":35,"textLines":1,"bbox":[696,480,520,85]}
+{"kind":"textbox","id":"sh/alkvq14f","slide":8,"name":"text-eebsfh-10","text":"+","textPreview":"+","textChars":1,"textLines":1,"bbox":[620,491,56,65]}
+{"kind":"textbox","id":"sh/xobu1g36","slide":8,"name":"text-eebsfh-11","text":"Если факта в материалах нет, инструкция просит модель обозначить пробел.\nДостижения и примеры нужно проверять.","textPreview":"Если факта в материалах нет, инструкция просит модель обозначить пробел. | Достижения и примеры нужно проверять.","textChars":110,"textLines":2,"bbox":[64,605,1140,72]}
+{"kind":"notes","id":"nt/eebsfh","slide":8,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/utils/interview-workflow.js; src/components/views/InterviewTools.js; src/components/views/AICustomizeView.js. Контекст вакансии фиксируется при запуске сессии. Извлечение релевантных фрагментов использует совпадения слов."}
+{"kind":"slide","id":"sl/dhx1uh","slide":9,"title":"Скриншот вместе с заданием","textShapes":9}
+{"kind":"textbox","id":"sh/0je1cvuh","slide":9,"name":"text-dhx1uh-0.6789362900964351","text":"Скриншот вместе с заданием","textPreview":"Скриншот вместе с заданием","textChars":26,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/zilk3qtc","slide":9,"name":"text-dhx1uh-1","text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/yhcja5cr","slide":9,"name":"text-dhx1uh-2","text":"Вставьте изображение, добавьте свой вопрос и отправьте, когда всё готово.","textPreview":"Вставьте изображение, добавьте свой вопрос и отправьте, когда всё готово.","textChars":73,"textLines":1,"bbox":[64,166,1120,78]}
+{"kind":"textbox","id":"sh/dg3i10v6","slide":9,"text":"Скриншоты\n+ текст запроса","textPreview":"Скриншоты | + текст запроса","textChars":25,"textLines":2,"bbox":[64,319,301,123]}
+{"kind":"textbox","id":"sh/cfu18vul","slide":9,"text":"OCR: извлечение текста","textPreview":"OCR: извлечение текста","textChars":22,"textLines":1,"bbox":[488,265,345,90]}
+{"kind":"textbox","id":"sh/bel0zqd0","slide":9,"text":"Изображение целиком","textPreview":"Изображение целиком","textChars":19,"textLines":1,"bbox":[488,456,345,90]}
+{"kind":"shape","id":"sh/qdcj6lcf","slide":9,"bbox":[365,310,123,70.5]}
+{"kind":"shape","id":"sh/hc72dkba","slide":9,"bbox":[365,380.5,123,120.5]}
+{"kind":"textbox","id":"sh/wby14fup","slide":9,"name":"text-dhx1uh-8","text":"Для кода и текста.\nРаспознанный текст\nможно исправить.","textPreview":"Для кода и текста. | Распознанный текст | можно исправить.","textChars":54,"textLines":3,"bbox":[886,269,328,120]}
+{"kind":"textbox","id":"sh/ilkny9gj","slide":9,"name":"text-dhx1uh-9","text":"Для схем и графиков.\nМодель учитывает\nрасположение и связи.","textPreview":"Для схем и графиков. | Модель учитывает | расположение и связи.","textChars":59,"textLines":3,"bbox":[886,459,328,120]}
+{"kind":"textbox","id":"sh/jmt4reh4","slide":9,"name":"text-dhx1uh-10","text":"Можно приложить несколько снимков к одному заданию.","textPreview":"Можно приложить несколько снимков к одному заданию.","textChars":51,"textLines":1,"bbox":[64,619,1120,42]}
+{"kind":"notes","id":"nt/dhx1uh","slide":9,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/components/views/InterviewTools.js; src/utils/hosted-ai.js. Стоимость зависит от выбранной OCR/vision-модели и провайдера. Обещания фиксированной экономии нет."}
+{"kind":"slide","id":"sl/hok38k","slide":10,"title":"Техническая задача по шагам","textShapes":10}
+{"kind":"textbox","id":"sh/gvm98jmp","slide":10,"name":"text-hok38k-0.14047775101849358","text":"Техническая задача по шагам","textPreview":"Техническая задача по шагам","textChars":27,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/vud8zy54","slide":10,"name":"text-hok38k-1","text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/ut4r6t4j","slide":10,"text":"Что уточнить","textPreview":"Что уточнить","textChars":12,"textLines":1,"bbox":[64,212,345,92]}
+{"kind":"textbox","id":"sh/5kfq58n6","slide":10,"text":"Идея решения","textPreview":"Идея решения","textChars":12,"textLines":1,"bbox":[468,212,345,92]}
+{"kind":"shape","id":"sh/4j69c3ml","slide":10,"bbox":[409,258,59,0]}
+{"kind":"textbox","id":"sh/3id83y5g","slide":10,"text":"Код","textPreview":"Код","textChars":3,"textLines":1,"bbox":[872,212,345,92]}
+{"kind":"shape","id":"sh/ix4rat4v","slide":10,"bbox":[813,258,59,0]}
+{"kind":"textbox","id":"sh/dofa98ni","slide":10,"text":"Сложность","textPreview":"Сложность","textChars":9,"textLines":1,"bbox":[872,376,345,92]}
+{"kind":"textbox","id":"sh/sn69g3mx","slide":10,"text":"Крайние случаи","textPreview":"Крайние случаи","textChars":14,"textLines":1,"bbox":[468,376,345,92]}
+{"kind":"shape","id":"sh/a5gzql83","slide":10,"bbox":[813,422,59,0]}
+{"kind":"textbox","id":"sh/vqp0zq9o","slide":10,"text":"Как объяснить","textPreview":"Как объяснить","textChars":13,"textLines":1,"bbox":[64,376,345,92]}
+{"kind":"shape","id":"sh/wryhsvq9","slide":10,"bbox":[409,422,59,0]}
+{"kind":"shape","id":"sh/xs7i10ru","slide":10,"bbox":[1044.5,304,0,72]}
+{"kind":"textbox","id":"sh/itgzu58f","slide":10,"name":"text-hok38k-13","text":"Go, Python и SQL","textPreview":"Go, Python и SQL","textChars":16,"textLines":1,"bbox":[64,565,450,45]}
+{"kind":"textbox","id":"sh/jup03a90","slide":10,"name":"text-hok38k-14","text":"Ручной запуск кода и тестов в Docker.\nБез сети, с ограничениями ресурсов и времени.","textPreview":"Ручной запуск кода и тестов в Docker. | Без сети, с ограничениями ресурсов и времени.","textChars":83,"textLines":2,"bbox":[524,561,692,86]}
+{"kind":"notes","id":"nt/hok38k","slide":10,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/utils/interview-workflow.js; src/utils/code-sandbox.js; src/components/views/InterviewTools.js. Код запускается вручную, при наличии Docker. SQL проверяется в SQLite. Race detector Go не включён."}
+{"kind":"slide","id":"sl/7rgxau","slide":11,"title":"System design с рабочей схемой","textShapes":10}
+{"kind":"textbox","id":"sh/mh87mt43","slide":11,"name":"text-7rgxau-0.40390049036720266","text":"System design с рабочей схемой","textPreview":"System design с рабочей схемой","textChars":30,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/9kjqx8nu","slide":11,"name":"text-7rgxau-1","text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/8japo3m9","slide":11,"name":"text-7rgxau-2","text":"Требования, нагрузка, API и решения остаются в одном проекте.\nНовое ограничение обновляет текущую архитектуру.","textPreview":"Требования, нагрузка, API и решения остаются в одном проекте. | Новое ограничение обновляет текущую архитектуру.","textChars":110,"textLines":2,"bbox":[64,165,1110,95]}
+{"kind":"textbox","id":"sh/zehory5s","slide":11,"text":"Клиент","textPreview":"Клиент","textChars":6,"textLines":1,"bbox":[64,346,235,87]}
+{"kind":"textbox","id":"sh/yd87it47","slide":11,"text":"API","textPreview":"API","textChars":3,"textLines":1,"bbox":[386,346,235,87]}
+{"kind":"textbox","id":"sh/lgzqtoni","slide":11,"text":"Кэш","textPreview":"Кэш","textChars":3,"textLines":1,"bbox":[716,295,220,87]}
+{"kind":"textbox","id":"sh/0fqpk3md","slide":11,"text":"Хранилище","textPreview":"Хранилище","textChars":9,"textLines":1,"bbox":[716,465,220,87]}
+{"kind":"shape","id":"sh/ja183ilw","slide":11,"bbox":[299,389.5,87,0]}
+{"kind":"shape","id":"sh/i9s7ud4b","slide":11,"bbox":[621,338.5,95,51]}
+{"kind":"shape","id":"sh/s7u5032l","slide":11,"bbox":[621,389.5,95,119]}
+{"kind":"textbox","id":"sh/t836t836","slide":11,"name":"text-7rgxau-10","text":"ПРИМЕР СХЕМЫ","textPreview":"ПРИМЕР СХЕМЫ","textChars":12,"textLines":1,"bbox":[997,313,220,32]}
+{"kind":"textbox","id":"sh/65snytkv","slide":11,"name":"text-7rgxau-11","text":"Узлы и связи\nпомогают\nобъяснить\nрешение.","textPreview":"Узлы и связи | помогают | объяснить | решение.","textChars":40,"textLines":4,"bbox":[997,354,220,161]}
+{"kind":"textbox","id":"sh/76lorylg","slide":11,"name":"text-7rgxau-12","text":"Добавьте «нужен multi-region», изучите изменения и при необходимости\nвернитесь к предыдущей версии.","textPreview":"Добавьте «нужен multi-region», изучите изменения и при необходимости | вернитесь к предыдущей версии.","textChars":99,"textLines":2,"bbox":[64,600,1152,72]}
+{"kind":"notes","id":"nt/7rgxau","slide":11,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/components/views/InterviewTools.js; src/utils/interview-workflow.js. Схема ниже демонстрационная. Реальный редактор поддерживает простые узлы и связи, требования, нагрузку, API, хранилища, решения, изменения и предыдущие версии."}
+{"kind":"slide","id":"sl/rydy4f","slide":12,"title":"Готовность и восстановление","textShapes":9}
+{"kind":"textbox","id":"sh/qh8fi9k3","slide":12,"name":"text-rydy4f-0.15613222378007363","text":"Готовность и восстановление","textPreview":"Готовность и восстановление","textChars":27,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/dkzytoje","slide":12,"name":"text-rydy4f-1","text":"12","textPreview":"12","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/cjqxkj29","slide":12,"name":"text-rydy4f-2","text":"ПЕРЕД СЕССИЕЙ","textPreview":"ПЕРЕД СЕССИЕЙ","textChars":13,"textLines":1,"bbox":[64,211,500,32]}
+{"kind":"textbox","id":"sh/z61gvy1k","slide":12,"name":"text-rydy4f-3","text":"Проверить готовность","textPreview":"Проверить готовность","textChars":20,"textLines":1,"bbox":[64,253,550,90]}
+{"kind":"textbox","id":"sh/e58fmtkz","slide":12,"name":"text-rydy4f-4","text":"Доступ к модели и время ответа\nЗахват экрана\nПоступление системного звука\nМикрофон, если он выбран","textPreview":"Доступ к модели и время ответа | Захват экрана | Поступление системного звука | Микрофон, если он выбран","textChars":98,"textLines":4,"bbox":[64,366,550,203]}
+{"kind":"textbox","id":"sh/18jyx8jq","slide":12,"name":"text-rydy4f-5","text":"ПРИ СБОЕ","textPreview":"ПРИ СБОЕ","textChars":8,"textLines":1,"bbox":[704,211,500,32]}
+{"kind":"textbox","id":"sh/07aho325","slide":12,"name":"text-rydy4f-6","text":"Продолжить сессию","textPreview":"Продолжить сессию","textChars":17,"textLines":1,"bbox":[704,253,512,90]}
+{"kind":"textbox","id":"sh/na1gzy1w","slide":12,"name":"text-rydy4f-7","text":"Сохранённые темы и черновик\nПоложение чтения\nПовтор конкретного запроса\nПродолжение после перезапуска","textPreview":"Сохранённые темы и черновик | Положение чтения | Повтор конкретного запроса | Продолжение после перезапуска","textChars":101,"textLines":4,"bbox":[704,366,512,203]}
+{"kind":"textbox","id":"sh/m9szqtkb","slide":12,"name":"text-rydy4f-8","text":"Сеть, доступность модели и разрешения macOS проверяются в реальных условиях звонка.","textPreview":"Сеть, доступность модели и разрешения macOS проверяются в реальных условиях звонка.","textChars":83,"textLines":1,"bbox":[64,633,1100,55]}
+{"kind":"notes","id":"nt/rydy4f","slide":12,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/utils/session-support.js; src/components/views/SessionConsole.js; src/components/app/CheatingDaddyApp.js. Проверка отражает момент запуска. Сохранение раз в секунду и при обычном закрытии. Повтор запроса может тарифицироваться повторно."}
+{"kind":"slide","id":"sl/j2ksm4","slide":13,"title":"После разговора остаётся план","textShapes":8}
+{"kind":"textbox","id":"sh/jatwvq5g","slide":13,"name":"text-j2ksm4-0.576578814602687","text":"После разговора остаётся план","textPreview":"После разговора остаётся план","textChars":29,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/kb2d4v61","slide":13,"name":"text-j2ksm4-1","text":"13","textPreview":"13","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/lcbex0nm","slide":13,"name":"text-j2ksm4-2","text":"History","textPreview":"History","textChars":7,"textLines":1,"bbox":[64,216,330,65]}
+{"kind":"textbox","id":"sh/a50vyloz","slide":13,"name":"text-j2ksm4-3","text":"Сохранённые вопросы\nи ответы. Удаление\nодной истории или всех.","textPreview":"Сохранённые вопросы | и ответы. Удаление | одной истории или всех.","textChars":62,"textLines":3,"bbox":[64,302,330,143]}
+{"kind":"textbox","id":"sh/b69crq54","slide":13,"text":"Что вызвало уточнения","textPreview":"Что вызвало уточнения","textChars":21,"textLines":1,"bbox":[492,202,708,75]}
+{"kind":"textbox","id":"sh/w7id0v6p","slide":13,"text":"Что стоит перепроверить","textPreview":"Что стоит перепроверить","textChars":23,"textLines":1,"bbox":[492,327,708,75]}
+{"kind":"textbox","id":"sh/x8ret0na","slide":13,"text":"Что повторить завтра","textPreview":"Что повторить завтра","textChars":20,"textLines":1,"bbox":[492,452,708,75]}
+{"kind":"shape","id":"sh/mh0vulon","slide":13,"bbox":[846,277,0,50]}
+{"kind":"shape","id":"sh/ni9cn658","slide":13,"bbox":[846,402,0,50]}
+{"kind":"textbox","id":"sh/napgvmt0","slide":13,"name":"text-j2ksm4-9","text":"Разбор помогает выбрать темы для повторения.\nОн анализирует историю запросов, а не оценивает ваши устные ответы.","textPreview":"Разбор помогает выбрать темы для повторения. | Он анализирует историю запросов, а не оценивает ваши устные ответы.","textChars":112,"textLines":2,"bbox":[64,600,1120,78]}
+{"kind":"notes","id":"nt/j2ksm4","slide":13,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/utils/session-support.js; src/components/views/HistoryView.js. Разбор локальный, эвристический. Демонстрационные примеры ниже. Устные ответы пользователя не оцениваются."}
+{"kind":"slide","id":"sl/3adgsr","slide":14,"title":"Выбор модели и контроль данных","textShapes":9}
+{"kind":"textbox","id":"sh/alk365s7","slide":14,"name":"text-3adgsr-0.9846969694519363","text":"Выбор модели и контроль данных","textPreview":"Выбор модели и контроль данных","textChars":30,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/xobm1kby","slide":14,"name":"text-3adgsr-1","text":"14","textPreview":"14","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/cn2l8fad","slide":14,"text":"Приложение\nна компьютере","textPreview":"Приложение | на компьютере","textChars":24,"textLines":2,"bbox":[64,254,306,129]}
+{"kind":"textbox","id":"sh/nitkvatw","slide":14,"text":"OpenRouter","textPreview":"OpenRouter","textChars":10,"textLines":1,"bbox":[494,205,298,87]}
+{"kind":"textbox","id":"sh/2h0325sb","slide":14,"text":"OpenAI","textPreview":"OpenAI","textChars":6,"textLines":1,"bbox":[494,377,298,87]}
+{"kind":"textbox","id":"sh/pkb2xkb2","slide":14,"text":"Выбранная\nмодель ответа","textPreview":"Выбранная | модель ответа","textChars":23,"textLines":2,"bbox":[902,273,304,121]}
+{"kind":"shape","id":"sh/oj2l4fah","slide":14,"bbox":[370,248.5,124,70]}
+{"kind":"shape","id":"sh/7ed47ut0","slide":14,"bbox":[370,318.5,124,102]}
+{"kind":"shape","id":"sh/md43epsf","slide":14,"bbox":[792,248.5,110,85]}
+{"kind":"shape","id":"sh/43694zi9","slide":14,"bbox":[792,333.5,110,87]}
+{"kind":"textbox","id":"sh/p4fqx4ju","slide":14,"name":"text-3adgsr-10","text":"Локально: настройки,\nматериалы и история.","textPreview":"Локально: настройки, | материалы и история.","textChars":41,"textLines":2,"bbox":[64,512,350,100]}
+{"kind":"textbox","id":"sh/2hor2p03","slide":14,"name":"text-3adgsr-11","text":"В выбранный сервис уходят данные\nдля обработки: текст, аудио\nи отправленные изображения.","textPreview":"В выбранный сервис уходят данные | для обработки: текст, аудио | и отправленные изображения.","textChars":88,"textLines":3,"bbox":[494,512,690,123]}
+{"kind":"textbox","id":"sh/32x8vu1o","slide":14,"name":"text-3adgsr-12","text":"Новые режимы работают с OpenAI и OpenRouter. Использование API оплачивается отдельно.","textPreview":"Новые режимы работают с OpenAI и OpenRouter. Использование API оплачивается отдельно.","textChars":85,"textLines":1,"bbox":[64,648,1140,38]}
+{"kind":"notes","id":"nt/3adgsr","slide":14,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. src/utils/hosted-ai.js; src/storage.js; src/utils/interview-storage.js; docs/INTERVIEW_CHECKLIST_RU.md. Новые режимы сессии рассчитаны на OpenAI и OpenRouter. Gemini/Groq и local существуют как другие режимы, без обещания полного паритета. API оплачивается отдельно."}
+{"kind":"slide","id":"sl/4m86lb","slide":15,"title":"Проверки ключевых сценариев","textShapes":5}
+{"kind":"textbox","id":"sh/v610b610","slide":15,"name":"text-4m86lb-0.7191919840312916","text":"Проверки ключевых сценариев","textPreview":"Проверки ключевых сценариев","textChars":27,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/w7ahkb2l","slide":15,"name":"text-4m86lb-1","text":"15","textPreview":"15","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/xsjidgj6","slide":15,"name":"text-4m86lb-2","text":"54","textPreview":"54","textChars":2,"textLines":1,"bbox":[64,217,310,156]}
+{"kind":"textbox","id":"sh/m18ze1kj","slide":15,"name":"text-4m86lb-3","text":"автоматических теста\nпрошли проверку","textPreview":"автоматических теста | прошли проверку","textChars":36,"textLines":2,"bbox":[68,389,350,110]}
+{"kind":"textbox","id":"sh/83qhgr29","slide":15,"name":"text-4m86lb-4","text":"Проверка от 23 сентября 2026. Автотесты дополняют репетицию звонка:\nзвук, разрешения и доступ к API зависят от компьютера и провайдера.","textPreview":"Проверка от 23 сентября 2026. Автотесты дополняют репетицию звонка: | звук, разрешения и доступ к API зависят от компьютера и провайдера.","textChars":135,"textLines":2,"bbox":[64,601,1148,83]}
+{"kind":"chart","id":"ch/rip07qdo","slide":15,"name":"","chartType":"bar","bbox":[438,193,774,379]}
+{"kind":"notes","id":"nt/4m86lb","slide":15,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. tests/*.test.js; presentation/.build/tests.txt. 54 теста прошли 23.09.2026. Группы: reading-position 21, hosted-ai 13, interview-workflow 6, остальные 14. Это количество автоматических сценариев, не процент покрытия и не гарантия отсутствия ошибок."}
+{"kind":"slide","id":"sl/c8gpy2","slide":16,"title":"Первый запуск","textShapes":14}
+{"kind":"textbox","id":"sh/fytcf6d4","slide":16,"name":"text-c8gpy2-0.017690320290712158","text":"Первый запуск","textPreview":"Первый запуск","textChars":13,"textLines":1,"bbox":[64,54,1152,108]}
+{"kind":"textbox","id":"sh/gzmd8rup","slide":16,"name":"text-c8gpy2-1","text":"16","textPreview":"16","textChars":2,"textLines":1,"bbox":[1160,665,56,25]}
+{"kind":"textbox","id":"sh/h0vuhwva","slide":16,"name":"text-c8gpy2-2","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[64,190,90,54]}
+{"kind":"textbox","id":"sh/2l4va1cv","slide":16,"name":"text-c8gpy2-3","text":"Откройте Cheating Daddy","textPreview":"Откройте Cheating Daddy","textChars":23,"textLines":1,"bbox":[183,190,1000,45]}
+{"kind":"textbox","id":"sh/3mdcj6dg","slide":16,"name":"text-c8gpy2-4","text":"Готовое приложение на Mac или npm install и npm start из исходников.","textPreview":"Готовое приложение на Mac или npm install и npm start из исходников.","textChars":68,"textLines":1,"bbox":[183,237,1000,52]}
+{"kind":"textbox","id":"sh/4nmdcbu1","slide":16,"name":"text-c8gpy2-5","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[64,296,90,54]}
+{"kind":"textbox","id":"sh/povelgvm","slide":16,"name":"text-c8gpy2-6","text":"Настройте модель и свой контекст","textPreview":"Настройте модель и свой контекст","textChars":32,"textLines":1,"bbox":[183,296,1000,45]}
+{"kind":"textbox","id":"sh/yp0vyhcr","slide":16,"name":"text-c8gpy2-7","text":"Ключ API, язык речи, профиль инструкций и материалы вакансии.","textPreview":"Ключ API, язык речи, профиль инструкций и материалы вакансии.","textChars":61,"textLines":1,"bbox":[183,343,1000,52]}
+{"kind":"textbox","id":"sh/jq9c7mdc","slide":16,"name":"text-c8gpy2-8","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[64,402,90,54]}
+{"kind":"textbox","id":"sh/zmh0ryds","slide":16,"name":"text-c8gpy2-9","text":"Проверьте готовность","textPreview":"Проверьте готовность","textChars":20,"textLines":1,"bbox":[183,402,1000,45]}
+{"kind":"textbox","id":"sh/ylojitc7","slide":16,"name":"text-c8gpy2-10","text":"Убедитесь, что модель отвечает, экран захватывается и звук поступает.","textPreview":"Убедитесь, что модель отвечает, экран захватывается и звук поступает.","textChars":69,"textLines":1,"bbox":[183,449,1000,52]}
+{"kind":"textbox","id":"sh/lozit8vy","slide":16,"name":"text-c8gpy2-11","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[64,508,90,54]}
+{"kind":"textbox","id":"sh/0nq1k3ud","slide":16,"name":"text-c8gpy2-12","text":"Начните пробную сессию","textPreview":"Начните пробную сессию","textChars":22,"textLines":1,"bbox":[183,508,1000,45]}
+{"kind":"textbox","id":"sh/bix0nydw","slide":16,"name":"text-c8gpy2-13","text":"Задайте вопрос, прочитайте ответ, добавьте уточнение и откройте History.","textPreview":"Задайте вопрос, прочитайте ответ, добавьте уточнение и откройте History.","textChars":72,"textLines":1,"bbox":[183,555,1000,52]}
+{"kind":"notes","id":"nt/c8gpy2","slide":16,"text":"Источник: текущий локальный проект Cheating Daddy, 23.09.2026. README.md; src/components/views/HelpView.js; docs/INTERVIEW_CHECKLIST_RU.md. Для текущей macOS-сборки путь /Applications/Cheating Daddy.app. Из исходников npm install и npm start."}

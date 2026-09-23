@@ -59,27 +59,19 @@ export class HelpView extends LitElement {
                 background: var(--bg-elevated);
             }
 
-            .link-row {
-                display: flex;
-                flex-wrap: wrap;
-                gap: var(--space-sm);
+            details {
+                padding: 12px 0;
+                border-bottom: 1px solid var(--border);
             }
-
-            .link-button {
-                border: 1px solid var(--border);
-                border-radius: var(--radius-sm);
-                padding: 8px 10px;
-                background: var(--bg-elevated);
-                color: var(--text-primary);
-                font-size: var(--font-size-sm);
+            summary {
                 cursor: pointer;
-                transition: border-color var(--transition), color var(--transition), background var(--transition);
-            }
-
-            .link-button:hover {
                 color: var(--text-primary);
-                border-color: var(--accent);
-                background: rgba(63, 125, 229, 0.14);
+                font-weight: 600;
+            }
+            details p {
+                color: var(--text-secondary);
+                line-height: 1.65;
+                margin: 10px 0 0;
             }
 
             @media (max-width: 820px) {
@@ -87,7 +79,6 @@ export class HelpView extends LitElement {
                     grid-template-columns: 1fr;
                 }
             }
-
         `,
     ];
 
@@ -127,13 +118,16 @@ export class HelpView extends LitElement {
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
             previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
+            focusMode: isMac ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
+            increaseFont: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
+            decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
         };
     }
 
     _formatKeybind(keybind) {
-        return keybind.split('+').map(key => html`<span class="key">${key}</span>`);
+        return (keybind || 'Не назначено').split('+').map(key => html`<span class="key">${key}</span>`);
     }
 
     _open(url) {
@@ -142,6 +136,9 @@ export class HelpView extends LitElement {
 
     render() {
         const shortcutRows = [
+            ['Только ответ / настройки', this.keybinds.focusMode],
+            ['Увеличить шрифт', this.keybinds.increaseFont],
+            ['Уменьшить шрифт', this.keybinds.decreaseFont],
             ['Move Window Up', this.keybinds.moveUp],
             ['Move Window Down', this.keybinds.moveDown],
             ['Move Window Left', this.keybinds.moveLeft],
@@ -161,23 +158,72 @@ export class HelpView extends LitElement {
                     <div class="page-title">Help</div>
 
                     <section class="surface">
-                        <div class="surface-title">Support</div>
-                        <div class="link-row">
-                            <button class="link-button" @click=${() => this._open('https://cheatingdaddy.com')}>Website</button>
-                            <button class="link-button" @click=${() => this._open('https://github.com/sohzm/cheating-daddy')}>GitHub</button>
-                            <button class="link-button" @click=${() => this._open('https://discord.gg/GCBdubnXfJ')}>Discord</button>
-                        </div>
+                        <div class="surface-title">Как пользоваться приложением</div>
+                        ${[
+                            [
+                                'Начало и проверка готовности',
+                                'На Home выберите провайдера и модель, укажите API-ключ. «Проверить готовность» проверяет ответ модели, захват экрана и поступление звука. Для проверки системного звука включите воспроизведение; для микрофона произнесите фразу. Проверка модели делает короткий платный API-запрос. Снимок и звук этой проверки не отправляются модели. После проверки нажмите Start Session.',
+                            ],
+                            [
+                                'Settings и язык',
+                                'Speech Language задаёт язык распознавания речи. Изменения сохраняются автоматически и применяются при следующем запуске сессии. Здесь же выбираются источник звука, размер текста, внешний вид и сочетания клавиш.',
+                            ],
+                            [
+                                'Вопросы и пауза',
+                                'Распознанные вопросы собираются в разделе «Вопросы». Перед отправкой можно исправить текст. Пауза останавливает автоматическую обработку разговора; письменные запросы продолжают работать и показывают ответ в текущем окне. Введите запрос и нажмите отправку — поле очистится.',
+                            ],
+                            [
+                                'Чтение ответов',
+                                'Новые ответы не переключают вас с текущего. Переходите между ними стрелками. A− и A+ меняют размер текста. «Только ответ» скрывает инструменты; вернуться можно через «Настройки» или горячую клавишу. Код подсвечивается, таблицы отображаются внутри ответа.',
+                            ],
+                            [
+                                'Скриншоты',
+                                'Вставьте изображение из буфера или нажмите «Снять экран», затем добавьте текст задания и отправьте запрос. Можно прикрепить несколько изображений. OCR извлекает текст с помощью отдельной модели; для схем используйте анализ изображения целиком. Распознанный текст можно исправить перед отправкой.',
+                            ],
+                            [
+                                'Темы и инструменты',
+                                'Уточнения можно направлять в текущую тему, а отдельные вопросы — в новую через «Настройки ответа». Темы можно объединять, разделять и удалять. Панель инструментов сворачивается стрелкой, освобождая место для ответа.',
+                            ],
+                            [
+                                'Preparation и AI Customization',
+                                'В Preparation добавьте резюме, вакансию и реальные истории проектов, сохраните пакет перед сессией. В AI Customization можно создавать, редактировать и удалять профили инструкций, выбирать активный профиль и дополнительные инструкции. Они задают стиль и контекст ответов.',
+                            ],
+                            [
+                                'Проверка кода и System design',
+                                'Технический режим помогает разобрать уточнения, идею, код, сложность и крайние случаи. Запуск кода и тестов выполняется отдельно в Docker — он должен быть установлен и запущен. System design хранит требования, компоненты и решения; новые ограничения обновляют проект, предыдущую версию можно восстановить.',
+                            ],
+                            [
+                                'History и разбор сессии',
+                                'History хранит вопросы и ответы. Можно удалить одну историю или все. После сессии разбор выделяет повторяющиеся темы и ответы, требующие проверки, и предлагает задания на завтра. Это анализ сохранённых запросов, а не оценка ваших устных ответов.',
+                            ],
+                            [
+                                'Сбой, повтор и восстановление',
+                                'Приложение периодически сохраняет текущие темы, черновик и положение чтения. После перезапуска Home предложит продолжить незавершённую сессию. При ошибке сети нажмите «Повторить запрос» у нужного ответа. Запросы сами повторно не отправляются. Последние изменения перед внезапным сбоем могут не успеть сохраниться.',
+                            ],
+                            [
+                                'Разрешения macOS',
+                                'Для захвата нужны разрешения на запись экрана и системного звука, для микрофона — отдельное разрешение. Выдайте их именно запускаемой копии приложения в System Settings → Privacy & Security, затем полностью закройте приложение через Cmd+Q и откройте снова.',
+                            ],
+                        ].map(
+                            ([title, body]) =>
+                                html`<details>
+                                    <summary>${title}</summary>
+                                    <p>${body}</p>
+                                </details>`
+                        )}
                     </section>
 
                     <section class="surface">
                         <div class="surface-title">Keyboard Shortcuts</div>
                         <div class="shortcut-grid">
-                            ${shortcutRows.map(([label, keys]) => html`
-                                <div class="shortcut-row">
-                                    <span class="shortcut-label">${label}</span>
-                                    <span class="shortcut-keys">${this._formatKeybind(keys)}</span>
-                                </div>
-                            `)}
+                            ${shortcutRows.map(
+                                ([label, keys]) => html`
+                                    <div class="shortcut-row">
+                                        <span class="shortcut-label">${label}</span>
+                                        <span class="shortcut-keys">${this._formatKeybind(keys)}</span>
+                                    </div>
+                                `
+                            )}
                         </div>
                     </section>
                 </div>

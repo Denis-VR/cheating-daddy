@@ -5,6 +5,13 @@ const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
+const { AsyncLocalStorage } = require('async_hooks');
+const manualRequestContext = new AsyncLocalStorage();
+const { HostedSession, PROVIDERS } = require('./hosted-ai');
+const { getCredentials } = require('../storage');
+let hostedSession = null;
+let capturePaused = false;
+
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
 // Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
@@ -60,6 +67,10 @@ const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY = 2000;
 
 function sendToRenderer(channel, data) {
+    const requestId = manualRequestContext.getStore();
+    if (requestId && (channel === 'new-response' || channel === 'update-response') && typeof data === 'string') {
+        data = { id: requestId, text: data };
+    }
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
         windows[0].webContents.send(channel, data);
@@ -89,6 +100,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
     groqConversationHistory = [];
     currentProfile = profile;
     currentCustomPrompt = customPrompt;
+    require('../storage').saveSession(currentSessionId, { profile, customPrompt, conversationHistory: [], screenAnalysisHistory: [] });
     console.log('New conversation session started:', currentSessionId, 'profile:', profile);
 
     // Save initial session with profile context
@@ -113,6 +125,7 @@ function saveConversationTurn(transcription, aiResponse) {
     };
 
     conversationHistory.push(conversationTurn);
+    require('../storage').saveSession(currentSessionId, { profile: currentProfile, customPrompt: currentCustomPrompt, conversationHistory });
     console.log('Saved conversation turn:', conversationTurn);
 
     // Send to renderer to save in IndexedDB
@@ -136,6 +149,7 @@ function saveScreenAnalysis(prompt, response, model) {
     };
 
     screenAnalysisHistory.push(analysisEntry);
+    require('../storage').saveSession(currentSessionId, { profile: currentProfile, customPrompt: currentCustomPrompt, screenAnalysisHistory });
     console.log('Saved screen analysis:', analysisEntry);
 
     // Send to renderer to save
@@ -911,6 +925,10 @@ async function startMacOSAudioCapture(geminiSessionRef) {
     let audioBuffer = Buffer.alloc(0);
 
     systemAudioProc.stdout.on('data', data => {
+        if (capturePaused) {
+            audioBuffer = Buffer.alloc(0);
+            return;
+        }
         audioBuffer = Buffer.concat([audioBuffer, data]);
 
         while (audioBuffer.length >= CHUNK_SIZE) {
@@ -919,7 +937,9 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
 
-            if (currentProviderMode === 'cloud') {
+            if (hostedSession) {
+                hostedSession.audio(monoChunk, 'system');
+            } else if (currentProviderMode === 'cloud') {
                 sendCloudAudio(monoChunk);
             } else if (currentProviderMode === 'local') {
                 getLocalAi().processLocalAudio(monoChunk);
@@ -1052,8 +1072,165 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
 function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
+    require('./session-support').installSessionSupport(ipcMain, () => !!hostedSession && !hostedSession.closed);
+
+    ipcMain.handle('initialize-hosted', async (_event, options) => {
+        let createdSession;
+        try {
+            if (
+                !options ||
+                !PROVIDERS[options.provider] ||
+                typeof options.profile !== 'string' ||
+                typeof options.language !== 'string' ||
+                !/^[a-z]{2}(-[A-Za-z]{2,4})?$/.test(options.language) ||
+                typeof options.customPrompt !== 'string' ||
+                options.customPrompt.length > 30000
+            ) {
+                throw new Error('Invalid session settings');
+            }
+            const { provider, profile, customPrompt, language } = options;
+            const config = getConfig();
+            const credentials = getCredentials();
+            const session = new HostedSession({
+                provider,
+                key: credentials[PROVIDERS[provider].keyField] || (provider === 'openai' ? credentials.openaiApiKey : ''),
+                model: config[`${provider}Model`] || PROVIDERS[provider].model,
+                systemPrompt: `${getSystemPrompt(profile, customPrompt, false)}\nRespond in ${language}. Use valid GitHub-flavored Markdown tables when the user asks for a table or a comparison benefits from one. Do not wrap tables in code fences.`,
+                language,
+                reviewAudio: true,
+                preparation: (() => {
+                    const w = require('./interview-storage').loadWorkspace();
+                    return w.packages.find(p => p.id === w.activePackageId);
+                })(),
+                emit: sendToRenderer,
+                save: (text, answer, model) => (model ? saveScreenAnalysis(text, answer, model) : saveConversationTurn(text, answer)),
+            });
+            createdSession = session;
+            hostedSession?.close();
+            hostedSession = session;
+            if (options.recoveredQuestions) {
+                if (
+                    !Array.isArray(options.recoveredQuestions) ||
+                    options.recoveredQuestions.length > 30 ||
+                    options.recoveredQuestions.some(
+                        q => !q || typeof q.id !== 'string' || typeof q.text !== 'string' || q.text.length > 12000 || !Number.isInteger(q.revision)
+                    )
+                )
+                    throw Error('Некорректная очередь');
+                session.questions.items = options.recoveredQuestions;
+            }
+            capturePaused = false;
+            currentProviderMode = provider;
+            if (options.resumeSessionId) {
+                if (typeof options.resumeSessionId !== 'string' || !/^\d+$/.test(options.resumeSessionId)) throw new Error('Некорректная сессия');
+                const previous = require('../storage').getSession(options.resumeSessionId);
+                if (!previous) throw new Error('Сохранённая история не найдена');
+                currentSessionId = options.resumeSessionId;
+                conversationHistory = previous.conversationHistory || [];
+                screenAnalysisHistory = previous.screenAnalysisHistory || [];
+                currentProfile = profile;
+                currentCustomPrompt = customPrompt;
+                session.history = conversationHistory.slice(-10).flatMap(t => [
+                    { role: 'user', content: t.transcription },
+                    { role: 'assistant', content: t.ai_response },
+                ]);
+                while (session.history.length > 2 && JSON.stringify(session.history).length > 60000) session.history.splice(0, 2);
+            } else initializeNewSession(profile, customPrompt);
+            sendToRenderer('update-status', 'Listening...');
+            return { success: true, sessionId: currentSessionId };
+        } catch (error) {
+            createdSession?.close();
+            if (hostedSession === createdSession) hostedSession = null;
+            return { success: false, error: error.message };
+        }
+    });
+
+    const guarded = fn => async (_event, value) => {
+        try {
+            return await fn(value);
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    };
+    ipcMain.handle(
+        'interview:workspace-load',
+        guarded(() => ({ success: true, data: require('./interview-storage').loadWorkspace() }))
+    );
+    ipcMain.handle(
+        'interview:workspace-save',
+        guarded(value => ({ success: true, data: require('./interview-storage').saveWorkspace(value) }))
+    );
+    ipcMain.handle(
+        'interview:import',
+        guarded(async value => ({ success: true, data: await require('./interview-storage').extractDocument(value) }))
+    );
+    ipcMain.handle(
+        'interview:sandbox-check',
+        guarded(() => require('./code-sandbox').checkSandbox())
+    );
+    ipcMain.handle(
+        'interview:run-code',
+        guarded(value => require('./code-sandbox').runCode(value))
+    );
+    ipcMain.handle(
+        'interview:questions',
+        guarded(() => ({ success: true, data: hostedSession?.questions.items || [] }))
+    );
+    ipcMain.handle(
+        'interview:discard-question',
+        guarded(value => {
+            hostedSession?.questions.take(value.id, value.revision);
+            return { success: true };
+        })
+    );
+    ipcMain.handle(
+        'interview:ocr',
+        guarded(async value => {
+            if (!hostedSession) throw new Error('Запустите сессию OpenAI или OpenRouter');
+            require('./interview-workflow').validateRequest({ ...value, text: 'OCR', requestId: 'ocr' });
+            return hostedSession.enqueue({ ocrOnly: true, images: value.images, requestId: 'ocr' });
+        })
+    );
+    ipcMain.handle(
+        'interview:ask',
+        guarded(async value => {
+            if (!hostedSession) throw new Error('Этот режим требует сессию OpenAI или OpenRouter');
+            require('./interview-workflow').validateRequest(value);
+            if (value.questionId) {
+                const item = hostedSession.questions.items.find(q => q.id === value.questionId);
+                if (!item || item.revision !== value.revision) throw new Error('Вопрос дополнен новой репликой. Проверьте его ещё раз.');
+            }
+            const session = hostedSession;
+            const removed = value.questionId ? session.questions.take(value.questionId, value.revision) : null;
+            const result = await session.enqueue(value);
+            if (!result.success && removed && !session.closed) {
+                session.questions.items.unshift({ ...removed, text: value.text, revision: removed.revision + 1 });
+                session.questions.publish();
+            }
+            return result;
+        })
+    );
+    ipcMain.handle(
+        'interview:cancel',
+        guarded(() => {
+            hostedSession?.controller?.abort();
+            return { success: true };
+        })
+    );
+
+    ipcMain.handle('set-session-paused', (_event, paused) => {
+        if (typeof paused !== 'boolean') return { success: false, error: 'Invalid pause state' };
+        capturePaused = paused;
+        hostedSession?.setPaused(paused);
+        if (currentProviderMode === 'local') getLocalAi().resetAudioBuffer();
+        sendToRenderer('update-status', paused ? 'Paused' : 'Listening...');
+        return { success: true, paused };
+    });
 
     ipcMain.handle('initialize-cloud', async (event, token, profile, userContext) => {
+        hostedSession?.close();
+        hostedSession = null;
+        capturePaused = false;
         try {
             currentProviderMode = 'cloud';
             initializeNewSession(profile);
@@ -1073,6 +1250,9 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
+        hostedSession?.close();
+        hostedSession = null;
+        capturePaused = false;
         currentProviderMode = 'byok';
         const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
         if (session) {
@@ -1083,6 +1263,9 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('initialize-local', async (event, localLlmModel, whisperModel, profile, customPrompt) => {
+        hostedSession?.close();
+        hostedSession = null;
+        capturePaused = false;
         currentProviderMode = 'local';
         const success = await getLocalAi().initializeLocalSession(localLlmModel, whisperModel, profile, customPrompt);
         if (!success) {
@@ -1100,6 +1283,17 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
+        if (capturePaused) return { success: true };
+        if (typeof data !== 'string' || data.length > 256000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
+            return { success: false, error: 'Invalid audio data' };
+        }
+        if (hostedSession) {
+            if (mimeType !== 'audio/pcm;rate=24000') return { success: false, error: 'Expected 24 kHz PCM16 audio' };
+            const pcm = Buffer.from(data, 'base64');
+            if (pcm.length % 2) return { success: false, error: 'Invalid PCM16 audio' };
+            hostedSession.audio(pcm, 'system');
+            return { success: true };
+        }
         if (currentProviderMode === 'cloud') {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
@@ -1135,6 +1329,17 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     // Handle microphone audio on a separate channel
     ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
+        if (capturePaused) return { success: true };
+        if (typeof data !== 'string' || data.length > 256000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
+            return { success: false, error: 'Invalid audio data' };
+        }
+        if (hostedSession) {
+            if (mimeType !== 'audio/pcm;rate=24000') return { success: false, error: 'Expected 24 kHz PCM16 audio' };
+            const pcm = Buffer.from(data, 'base64');
+            if (pcm.length % 2) return { success: false, error: 'Invalid PCM16 audio' };
+            hostedSession.audio(pcm, 'mic');
+            return { success: true };
+        }
         if (currentProviderMode === 'cloud') {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
@@ -1168,85 +1373,105 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('send-image-content', async (event, { data, prompt }) => {
-        try {
-            if (!data || typeof data !== 'string') {
-                console.error('Invalid image data received');
-                return { success: false, error: 'Invalid image data' };
+    ipcMain.handle('send-image-content', async (event, { data, prompt, requestId, context }) =>
+        manualRequestContext.run(requestId, async () => {
+            try {
+                if (requestId !== undefined && (typeof requestId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(requestId)))
+                    return { success: false, error: 'Invalid request ID' };
+                if (context !== undefined && (typeof context !== 'string' || context.length > 30000))
+                    return { success: false, error: 'Invalid context' };
+                if (typeof prompt !== 'string' || prompt.length > 30000 || typeof data !== 'string' || data.length > 14000000) {
+                    return { success: false, error: 'Invalid image request' };
+                }
+                if (hostedSession) return await hostedSession.enqueue({ text: prompt, image: data, requestId, context });
+                if (!data || typeof data !== 'string') {
+                    console.error('Invalid image data received');
+                    return { success: false, error: 'Invalid image data' };
+                }
+
+                const buffer = Buffer.from(data, 'base64');
+
+                if (buffer.length < 1000) {
+                    console.error(`Image buffer too small: ${buffer.length} bytes`);
+                    return { success: false, error: 'Image buffer too small' };
+                }
+
+                process.stdout.write('!');
+
+                if (currentProviderMode === 'cloud') {
+                    const sent = sendCloudImage(data);
+                    if (!sent) {
+                        return { success: false, error: 'Cloud connection not active' };
+                    }
+                    return { success: true, model: 'cloud' };
+                }
+
+                if (currentProviderMode === 'local') {
+                    const result = await getLocalAi().sendLocalImage(data, prompt);
+                    return result;
+                }
+
+                const result = hasGroqKey() ? await sendImageToGroq(data, prompt) : await sendImageToGeminiHttp(data, prompt);
+                return result;
+            } catch (error) {
+                console.error('Error sending image:', error);
+                return { success: false, error: error.message };
+            }
+        })
+    );
+
+    ipcMain.handle('send-text-message', async (event, payload) => {
+        const text = typeof payload === 'string' ? payload : payload?.text;
+        const requestId = typeof payload === 'object' ? payload?.requestId : undefined;
+        const context = typeof payload === 'object' ? payload?.context : undefined;
+        if (requestId !== undefined && (typeof requestId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(requestId)))
+            return { success: false, error: 'Invalid request ID' };
+        if (context !== undefined && (typeof context !== 'string' || context.length > 30000)) return { success: false, error: 'Invalid context' };
+        return manualRequestContext.run(requestId, async () => {
+            if (!text || typeof text !== 'string' || text.trim().length === 0 || text.length > 30000) {
+                return { success: false, error: 'Invalid text message' };
             }
 
-            const buffer = Buffer.from(data, 'base64');
-
-            if (buffer.length < 1000) {
-                console.error(`Image buffer too small: ${buffer.length} bytes`);
-                return { success: false, error: 'Image buffer too small' };
-            }
-
-            process.stdout.write('!');
+            if (hostedSession) return await hostedSession.enqueue({ text: text.trim(), requestId, context });
 
             if (currentProviderMode === 'cloud') {
-                const sent = sendCloudImage(data);
-                if (!sent) {
-                    return { success: false, error: 'Cloud connection not active' };
+                try {
+                    console.log('Sending text to cloud:', text);
+                    sendCloudText(text.trim());
+                    return { success: true };
+                } catch (error) {
+                    console.error('Error sending cloud text:', error);
+                    return { success: false, error: error.message };
                 }
-                return { success: true, model: 'cloud' };
             }
 
             if (currentProviderMode === 'local') {
-                const result = await getLocalAi().sendLocalImage(data, prompt);
-                return result;
+                try {
+                    console.log('Sending text to local Llama:', text);
+                    return await getLocalAi().sendLocalText(text.trim());
+                } catch (error) {
+                    console.error('Error sending local text:', error);
+                    return { success: false, error: error.message };
+                }
             }
 
-            const result = hasGroqKey() ? await sendImageToGroq(data, prompt) : await sendImageToGeminiHttp(data, prompt);
-            return result;
-        } catch (error) {
-            console.error('Error sending image:', error);
-            return { success: false, error: error.message };
-        }
-    });
+            if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
-    ipcMain.handle('send-text-message', async (event, text) => {
-        if (!text || typeof text !== 'string' || text.trim().length === 0) {
-            return { success: false, error: 'Invalid text message' };
-        }
-
-        if (currentProviderMode === 'cloud') {
             try {
-                console.log('Sending text to cloud:', text);
-                sendCloudText(text.trim());
+                console.log('Sending text message:', text);
+
+                if (requestId) {
+                    if (hasGroqKey()) await sendToGroq(text.trim());
+                    else await sendToGemma(text.trim());
+                } else {
+                    await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
+                }
                 return { success: true };
             } catch (error) {
-                console.error('Error sending cloud text:', error);
+                console.error('Error sending text:', error);
                 return { success: false, error: error.message };
             }
-        }
-
-        if (currentProviderMode === 'local') {
-            try {
-                console.log('Sending text to local Llama:', text);
-                return await getLocalAi().sendLocalText(text.trim());
-            } catch (error) {
-                console.error('Error sending local text:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-
-        try {
-            console.log('Sending text message:', text);
-
-            if (hasGroqKey()) {
-                groqRequestStartedForTurn = true;
-                sendToGroq(text.trim());
-            }
-
-            await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
-            return { success: true };
-        } catch (error) {
-            console.error('Error sending text:', error);
-            return { success: false, error: error.message };
-        }
+        });
     });
 
     ipcMain.handle('start-macos-audio', async event => {
@@ -1279,6 +1504,14 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('close-session', async event => {
         try {
             stopMacOSAudioCapture();
+            capturePaused = false;
+            if (hostedSession) {
+                hostedSession.close();
+                hostedSession = null;
+                currentProviderMode = 'byok';
+                closeTransportLog();
+                return { success: true };
+            }
 
             if (currentProviderMode === 'cloud') {
                 closeCloud();

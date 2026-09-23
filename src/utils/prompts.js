@@ -215,11 +215,17 @@ function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled =
 }
 
 function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+    const saved = require('../storage').getPreferences().aiProfiles;
+    if (saved) {
+        const selected = saved.find(item => item.id === profile);
+        return `${selected?.text || ''}\n\nUser-provided context\n${customPrompt}`;
+    }
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
     return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
 }
 
 module.exports = {
     profilePrompts,
+    buildSystemPrompt,
     getSystemPrompt,
 };

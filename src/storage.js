@@ -13,15 +13,21 @@ const DEFAULT_CONFIG = {
     groqModel: 'qwen/qwen3.6-27b',
     groqImageModel: 'qwen/qwen3.6-27b',
     disableGroqThinking: true,
+    openaiModel: 'gpt-4o-mini',
+    openrouterModel: 'openai/gpt-4o-mini',
 };
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
     groqApiKey: '',
+    openaiKey: '',
+    openrouterKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
+    instructionPresets: [],
+    activeInstructionId: '',
     providerMode: 'byok',
     selectedProfile: 'interview',
     selectedLanguage: 'en-US',
@@ -29,7 +35,7 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
-    fontSize: 'medium',
+    fontSize: 20,
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
     localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
@@ -103,7 +109,9 @@ function writeJsonFile(filePath, data) {
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+        const temp = filePath + '.tmp';
+        fs.writeFileSync(temp, JSON.stringify(data, null, 2), 'utf8');
+        fs.renameSync(temp, filePath);
         return true;
     } catch (error) {
         console.error(`Error writing ${filePath}:`, error.message);
@@ -151,15 +159,9 @@ function resetConfigDir() {
 
 // Initialize storage - call this on app startup
 function initializeStorage() {
-    if (needsReset()) {
-        resetConfigDir();
-    } else {
-        // Ensure history directory exists
-        const historyDir = getHistoryDir();
-        if (!fs.existsSync(historyDir)) {
-            fs.mkdirSync(historyDir, { recursive: true });
-        }
-    }
+    fs.mkdirSync(getHistoryDir(), { recursive: true });
+    const config = getConfig();
+    writeJsonFile(getConfigPath(), { ...config, configVersion: CONFIG_VERSION });
 }
 
 // ============ CONFIG ============
@@ -220,18 +222,75 @@ function getPreferences() {
         'Xenova/whisper-small': 'small.en',
     };
 
+    if (!Array.isArray(preferences.instructionPresets) || !preferences.instructionPresets.length) {
+        preferences.instructionPresets = [{ id: 'default', name: 'Мои инструкции', text: preferences.customPrompt || '' }];
+        preferences.activeInstructionId = 'default';
+    }
+    const active = preferences.instructionPresets.find(item => item.id === preferences.activeInstructionId) || preferences.instructionPresets[0];
+    preferences.activeInstructionId = active.id;
+    preferences.customPrompt = active.text;
+    preferences.fontSize = { small: 16, medium: 20, large: 24 }[preferences.fontSize] || preferences.fontSize;
     preferences.whisperModel = legacyWhisperModels[preferences.whisperModel] || preferences.whisperModel;
+    if (!Array.isArray(preferences.aiProfiles)) {
+        const { profilePrompts, buildSystemPrompt } = require('./utils/prompts');
+        const names = {
+            interview: 'Job Interview',
+            sales: 'Sales Call',
+            meeting: 'Business Meeting',
+            presentation: 'Presentation',
+            negotiation: 'Negotiation',
+            exam: 'Exam Assistant',
+        };
+        preferences.aiProfiles = Object.entries(profilePrompts).map(([id, parts]) => ({
+            id,
+            name: names[id],
+            text: buildSystemPrompt(parts, '', false),
+        }));
+    }
+    if (!preferences.aiProfiles.some(item => item.id === preferences.selectedProfile))
+        preferences.selectedProfile = preferences.aiProfiles[0]?.id || '';
     return preferences;
 }
 
 function setPreferences(preferences) {
     const current = getPreferences();
+    for (const field of ['instructionPresets', 'aiProfiles']) {
+        if (preferences[field] === undefined) continue;
+        const presets = preferences[field];
+        if (
+            !Array.isArray(presets) ||
+            (field === 'instructionPresets' && !presets.length) ||
+            presets.length > 100 ||
+            presets.some(
+                item =>
+                    !item ||
+                    typeof item.id !== 'string' ||
+                    !/^[a-zA-Z0-9-]{1,80}$/.test(item.id) ||
+                    typeof item.name !== 'string' ||
+                    !item.name.trim() ||
+                    item.name.length > 100 ||
+                    typeof item.text !== 'string' ||
+                    item.text.length > 30000
+            ) ||
+            new Set(presets.map(item => item.id)).size !== presets.length
+        ) {
+            throw new Error('Invalid instruction presets');
+        }
+    }
     const updated = { ...current, ...preferences };
+    if (!updated.aiProfiles.some(item => item.id === updated.selectedProfile)) updated.selectedProfile = updated.aiProfiles[0]?.id || '';
+    if (!updated.instructionPresets.some(item => item.id === updated.activeInstructionId)) throw new Error('Unknown instruction preset');
+    updated.customPrompt = updated.instructionPresets.find(item => item.id === updated.activeInstructionId).text;
     return writeJsonFile(getPreferencesPath(), updated);
 }
 
 function updatePreference(key, value) {
     const preferences = getPreferences();
+    if (key === 'customPrompt') {
+        preferences.instructionPresets = preferences.instructionPresets.map(item =>
+            item.id === preferences.activeInstructionId ? { ...item, text: value } : item
+        );
+    }
     preferences[key] = value;
     return writeJsonFile(getPreferencesPath(), preferences);
 }
@@ -391,6 +450,7 @@ function getModelForToday() {
 // ============ HISTORY ============
 
 function getSessionPath(sessionId) {
+    if (typeof sessionId !== 'string' || !/^[a-zA-Z0-9_-]{1,150}$/.test(sessionId)) throw new Error('Invalid session ID');
     return path.join(getHistoryDir(), `${sessionId}.json`);
 }
 

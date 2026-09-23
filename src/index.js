@@ -19,12 +19,6 @@ app.whenReady().then(async () => {
     // Initialize storage (checks version, resets if needed)
     storage.initializeStorage();
 
-    // Trigger screen recording permission prompt on macOS if not already granted
-    if (process.platform === 'darwin') {
-        const { desktopCapturer } = require('electron');
-        desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
-    }
-
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
@@ -92,6 +86,20 @@ function setupStorageIpcHandlers() {
 
     ipcMain.handle('storage:set-credentials', async (event, credentials) => {
         try {
+            if (
+                !credentials ||
+                typeof credentials !== 'object' ||
+                Array.isArray(credentials) ||
+                Object.entries(credentials).some(
+                    ([key, value]) =>
+                        !['apiKey', 'groqApiKey', 'openaiKey', 'openaiApiKey', 'openrouterKey', 'cloudToken'].includes(key) ||
+                        typeof value !== 'string' ||
+                        value.length > 4096 ||
+                        /[\r\n]/.test(value)
+                )
+            ) {
+                throw new Error('Invalid credentials');
+            }
             storage.setCredentials(credentials);
             return { success: true };
         } catch (error) {
@@ -150,7 +158,7 @@ function setupStorageIpcHandlers() {
 
     ipcMain.handle('storage:set-preferences', async (event, preferences) => {
         try {
-            storage.setPreferences(preferences);
+            if (!storage.setPreferences(preferences)) throw new Error('Не удалось записать настройки на диск');
             return { success: true };
         } catch (error) {
             console.error('Error setting preferences:', error);
@@ -160,7 +168,7 @@ function setupStorageIpcHandlers() {
 
     ipcMain.handle('storage:update-preference', async (event, key, value) => {
         try {
-            storage.updatePreference(key, value);
+            if (!storage.updatePreference(key, value)) throw new Error('Не удалось записать настройки');
             return { success: true };
         } catch (error) {
             console.error('Error updating preference:', error);
@@ -219,7 +227,7 @@ function setupStorageIpcHandlers() {
 
     ipcMain.handle('storage:delete-session', async (event, sessionId) => {
         try {
-            storage.deleteSession(sessionId);
+            if (!storage.deleteSession(sessionId)) throw new Error('Не удалось удалить сессию');
             return { success: true };
         } catch (error) {
             console.error('Error deleting session:', error);
@@ -229,7 +237,7 @@ function setupStorageIpcHandlers() {
 
     ipcMain.handle('storage:delete-all-sessions', async () => {
         try {
-            storage.deleteAllSessions();
+            if (!storage.deleteAllSessions()) throw new Error('Не удалось удалить историю');
             return { success: true };
         } catch (error) {
             console.error('Error deleting all sessions:', error);

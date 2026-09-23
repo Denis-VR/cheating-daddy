@@ -23,12 +23,12 @@ export class MainView extends LitElement {
         }
 
         :host {
-            height: 100%;
+            min-width: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: var(--space-xl) var(--space-lg);
+            justify-content: flex-start;
+            padding: 0;
         }
 
         .form-wrapper {
@@ -689,15 +689,20 @@ export class MainView extends LitElement {
         selectedProfile: { type: String },
         onProfileChange: { type: Function },
         isInitializing: { type: Boolean },
+        errorMessage: { type: String },
         whisperDownloading: { type: Boolean },
         downloadProgress: { type: Object },
         onCancelDownload: { type: Function },
         // Internal state
         _mode: { state: true },
+        _instructionName: { state: true },
         _token: { state: true },
         _geminiKey: { state: true },
         _groqKey: { state: true },
         _openaiKey: { state: true },
+        _openrouterKey: { state: true },
+        _openaiModel: { state: true },
+        _openrouterModel: { state: true },
         _geminiLiveModel: { state: true },
         _groqModel: { state: true },
         _groqImageModel: { state: true },
@@ -718,15 +723,20 @@ export class MainView extends LitElement {
         this.selectedProfile = 'interview';
         this.onProfileChange = () => {};
         this.isInitializing = false;
+        this.errorMessage = '';
         this.whisperDownloading = false;
         this.downloadProgress = { active: false, label: '', percentage: null };
         this.onCancelDownload = () => {};
 
         this._mode = 'byok';
+        this._instructionName = '';
         this._token = '';
         this._geminiKey = '';
         this._groqKey = '';
         this._openaiKey = '';
+        this._openrouterKey = '';
+        this._openaiModel = 'gpt-4o-mini';
+        this._openrouterModel = 'openai/gpt-4o-mini';
         this._geminiLiveModel = 'gemini-3.1-flash-live-preview';
         this._groqModel = 'qwen/qwen3.6-27b';
         this._groqImageModel = 'qwen/qwen3.6-27b';
@@ -755,6 +765,7 @@ export class MainView extends LitElement {
                 cheatingDaddy.storage.getCredentials().catch(() => ({})),
             ]);
 
+            this._instructionName = prefs.instructionPresets?.find(item => item.id === prefs.activeInstructionId)?.name || 'Мои инструкции';
             const storedMode = prefs.providerMode || 'byok';
             this._mode = storedMode === 'cloud' ? 'byok' : storedMode;
 
@@ -766,7 +777,10 @@ export class MainView extends LitElement {
             this._token = creds.cloudToken || '';
             this._geminiKey = (await cheatingDaddy.storage.getApiKey().catch(() => '')) || '';
             this._groqKey = (await cheatingDaddy.storage.getGroqApiKey().catch(() => '')) || '';
-            this._openaiKey = creds.openaiKey || '';
+            this._openaiKey = creds.openaiKey || creds.openaiApiKey || '';
+            this._openrouterKey = creds.openrouterKey || '';
+            this._openaiModel = config.openaiModel || 'gpt-4o-mini';
+            this._openrouterModel = config.openrouterModel || 'openai/gpt-4o-mini';
             this._geminiLiveModel = config.geminiLiveModel || 'gemini-3.1-flash-live-preview';
             this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
             this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
@@ -1028,6 +1042,11 @@ export class MainView extends LitElement {
                 this.requestUpdate();
                 return;
             }
+        } else if (['openai', 'openrouter'].includes(this._mode)) {
+            if (!this[this._mode === 'openai' ? '_openaiKey' : '_openrouterKey'].trim()) {
+                this._keyError = true;
+                return;
+            }
         } else if (this._mode === 'local') {
             if (!this._localLlmModel.trim()) {
                 return;
@@ -1245,6 +1264,61 @@ export class MainView extends LitElement {
 
     // ── Local AI mode ──
 
+    async _saveHostedField(field, value, credential = false) {
+        this[`_${field}`] = value;
+        this._keyError = false;
+        const result = credential
+            ? await cheatingDaddy.storage.setCredentials({ [field]: value.trim() })
+            : await cheatingDaddy.storage.updateConfig(field, value.trim());
+        if (!result.success) this._keyError = true;
+    }
+
+    _renderHostedMode() {
+        const router = this._mode === 'openrouter';
+        const keyField = router ? 'openrouterKey' : 'openaiKey';
+        const modelField = router ? 'openrouterModel' : 'openaiModel';
+        return html`
+            <div class="config-section">
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label" for="hosted-key">${router ? 'OpenRouter' : 'OpenAI'} API Key</label>
+                        <input
+                            id="hosted-key"
+                            type="password"
+                            autocomplete="off"
+                            placeholder="Required"
+                            .value=${this[`_${keyField}`]}
+                            class=${this._keyError ? 'error' : ''}
+                            @input=${e => this._saveHostedField(keyField, e.target.value, true)}
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="hosted-model">OpenAI response model</label>
+                        <input
+                            id="hosted-model"
+                            type="text"
+                            .value=${this[`_${modelField}`]}
+                            placeholder=${router ? 'openai/gpt-4o-mini' : 'gpt-4o-mini'}
+                            @input=${e => this._saveHostedField(modelField, e.target.value)}
+                        />
+                        <div class="form-hint">
+                            ${router ? 'Use an openai/ model ID from OpenRouter.' : 'Use an OpenAI model that supports Chat Completions and images.'}
+                        </div>
+                    </div>
+                    <div class="form-hint">
+                        Speech is transcribed by Whisper through ${router ? 'OpenRouter' : 'OpenAI'} using this key. Audio and manual screenshots are
+                        sent to the selected service. API usage is billed separately from ChatGPT.
+                    </div>
+                    <div class="form-hint">
+                        New answers wait while you read. Use the arrows to move to the next answer. Pause stops audio only. Text questions and Analyze
+                        Screen stay available.
+                    </div>
+                </div>
+            </div>
+            ${this._renderStartButton()}
+        `;
+    }
+
     _renderLocalMode() {
         return html`
             <details class="config-section">
@@ -1339,12 +1413,28 @@ export class MainView extends LitElement {
                                   <button class="help-btn" @click=${this._openLocalHelp} aria-label="Open Local AI help">${helpIcon}</button>
                               </div>
                           `
-                        : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `
+                        : html`
+                              <div class="page-title">
+                                  ${html`Cheating Daddy <span class="mode-suffix">${this._mode === 'openrouter' ? 'OpenRouter' : this._mode === 'openai' ? 'OpenAI' : 'BYOK'}</span>`}
+                              </div>
+                          `
                 }
-                <div class="page-subtitle">${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}</div>
+                <div class="page-subtitle">Choose how to answer your calls</div>
+                <div class="form-group">
+                    <label class="form-label" for="provider-mode">AI provider</label>
+                    <select id="provider-mode" .value=${this._mode} @change=${e => this._saveMode(e.target.value)}>
+                        <option value="openrouter">OpenRouter · OpenAI models</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="byok">Gemini / Groq</option>
+                        <option value="local">Local AI</option>
+                    </select>
+                </div>
 
+                ${this.errorMessage ? html`<div class="form-hint" role="alert">${this.errorMessage}</div>` : ''}
+                <div class="form-hint">Инструкции для новой сессии: ${this._instructionName}. Выбор — в AI Customization.</div>
                 <!-- Cloud mode render branch intentionally disabled. -->
                 ${this._mode === 'byok' ? this._renderByokMode() : ''} ${this._mode === 'local' ? this._renderLocalMode() : ''}
+                ${['openai', 'openrouter'].includes(this._mode) ? this._renderHostedMode() : ''}
             </div>
             ${this._mode === 'local' && this._showLocalHelp ? this._renderLocalHelp(closeIcon) : ''}
         `;

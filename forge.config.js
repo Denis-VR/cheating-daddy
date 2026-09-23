@@ -4,6 +4,10 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
     packagerConfig: {
         asar: true,
+        appBundleId: 'com.denis.cheatingdaddy',
+        osxSign: process.env.CD_SIGN_IDENTITY
+            ? { identity: process.env.CD_SIGN_IDENTITY, optionsForFile: () => ({ entitlements: 'entitlements.plist' }) }
+            : undefined,
         extraResource: ['./src/assets/SystemAudioDump'],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',

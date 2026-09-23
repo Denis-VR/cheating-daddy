@@ -1,3 +1,4 @@
+import '../views/SessionConsole.js';
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { MainView } from '../views/MainView.js';
 import { CustomizeView } from '../views/CustomizeView.js';
@@ -5,8 +6,8 @@ import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
+import { InterviewTools } from '../views/InterviewTools.js';
 import { AICustomizeView } from '../views/AICustomizeView.js';
-import { FeedbackView } from '../views/FeedbackView.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -334,6 +335,18 @@ export class CheatingDaddyApp extends LitElement {
             overflow-x: hidden;
         }
 
+        .home-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 48px 24px 24px;
+            min-width: 0;
+        }
+        .home-content > * {
+            min-width: 0;
+            width: 100%;
+        }
+
         .content-inner.live {
             overflow: hidden;
             display: flex;
@@ -368,6 +381,11 @@ export class CheatingDaddyApp extends LitElement {
     `;
 
     static properties = {
+        focusMode: { state: true },
+        recovery: { state: true },
+        lastReview: { state: true },
+        _preflightBusy: { state: true },
+
         currentView: { type: String },
         statusText: { type: String },
         startTime: { type: Number },
@@ -385,6 +403,12 @@ export class CheatingDaddyApp extends LitElement {
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
         _storageLoaded: { state: true },
+        _isPaused: { state: true },
+        _pausePending: { state: true },
+        _manualRequestRevision: { state: true },
+        _starting: { state: true },
+        _ending: { state: true },
+        _startError: { state: true },
         _updateAvailable: { state: true },
         _whisperDownloading: { state: true },
         _localAiDownloadProgress: { state: true },
@@ -403,6 +427,17 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.responses = [];
+        this.topicMeta = [];
+        this._responseIds = new Map();
+        this._inlineRequests = new Map();
+        this._manualRequestRevision = 0;
+        this._baseResponses = new Map();
+        this._isPaused = false;
+        this._pausePending = false;
+        this._starting = false;
+        this._ending = false;
+        this._sessionGeneration = 0;
+        this._startError = '';
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
         this._isClickThrough = false;
@@ -417,30 +452,12 @@ export class CheatingDaddyApp extends LitElement {
         this._localVersion = '';
 
         this._loadFromStorage();
-        this._checkForUpdates();
+        this._loadVersion();
     }
 
-    async _checkForUpdates() {
-        try {
-            this._localVersion = await cheatingDaddy.getVersion();
-            this.requestUpdate();
-
-            const res = await fetch('https://raw.githubusercontent.com/sohzm/cheating-daddy/refs/heads/master/package.json');
-            if (!res.ok) return;
-            const remote = await res.json();
-            const remoteVersion = remote.version;
-
-            const toNum = v => v.split('.').map(Number);
-            const [rMaj, rMin, rPatch] = toNum(remoteVersion);
-            const [lMaj, lMin, lPatch] = toNum(this._localVersion);
-
-            if (rMaj > lMaj || (rMaj === lMaj && rMin > lMin) || (rMaj === lMaj && rMin === lMin && rPatch > lPatch)) {
-                this._updateAvailable = true;
-                this.requestUpdate();
-            }
-        } catch (e) {
-            // silently ignore
-        }
+    async _loadVersion() {
+        this._localVersion = await cheatingDaddy.getVersion().catch(() => '');
+        this.requestUpdate();
     }
 
     async _loadFromStorage() {
@@ -448,12 +465,13 @@ export class CheatingDaddyApp extends LitElement {
             const [config, prefs] = await Promise.all([cheatingDaddy.storage.getConfig(), cheatingDaddy.storage.getPreferences()]);
 
             this.currentView = config.onboarded ? 'main' : 'onboarding';
-            this.selectedProfile = prefs.selectedProfile || 'interview';
+            this.selectedProfile = prefs.selectedProfile ?? 'interview';
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
 
+            this.recovery = (await window.require('electron').ipcRenderer.invoke('session:recovery-load')).data || null;
             this._storageLoaded = true;
             this.requestUpdate();
         } catch (error) {
@@ -465,9 +483,29 @@ export class CheatingDaddyApp extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+        this._recoveryTimer = setInterval(() => this.persistRecovery(), 1000);
+        this._saveBeforeQuit = () => {
+            if (this.sessionActive && this.hostedMode) {
+                try {
+                    window.require('electron').ipcRenderer.sendSync('session:recovery-sync', this.recoverySnapshot());
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        };
+        window.addEventListener('beforeunload', this._saveBeforeQuit);
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
+            ipcRenderer.on('toggle-focus-mode', () => {
+                if (this.sessionActive && Date.now() - (this._lastFocusToggle || 0) > 100) {
+                    this.focusMode = !this.focusMode;
+                    this._lastFocusToggle = Date.now();
+                }
+            });
+            ipcRenderer.on('toggle-session-pause', () => {
+                if (this.sessionActive) this.togglePause();
+            });
             ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
             ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));
             ipcRenderer.on('update-status', (_, status) => this.setStatus(status));
@@ -486,9 +524,13 @@ export class CheatingDaddyApp extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        clearInterval(this._recoveryTimer);
+        window.removeEventListener('beforeunload', this._saveBeforeQuit);
         this._stopTimer();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
+            ipcRenderer.removeAllListeners('toggle-focus-mode');
+            ipcRenderer.removeAllListeners('toggle-session-pause');
             ipcRenderer.removeAllListeners('new-response');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
@@ -535,48 +577,302 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-    addNewResponse(response) {
-        const wasOnLatest = this.currentResponseIndex === this.responses.length - 1;
-        this.responses = [...this.responses, response];
-        if (wasOnLatest || this.currentResponseIndex === -1) {
-            this.currentResponseIndex = this.responses.length - 1;
+    async togglePause() {
+        if (this._pausePending || !this.sessionActive) return;
+        this._pausePending = true;
+        try {
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('set-session-paused', !this._isPaused);
+            if (result.success) this._isPaused = result.paused;
+            else this.setStatus(result.error);
+        } catch (error) {
+            this.setStatus(error.message);
+        } finally {
+            this._pausePending = false;
         }
+    }
+
+    editTopic(index, patch) {
+        this.topicMeta[index] = { ...this.topicMeta[index], ...patch };
+        this.topicMeta = [...this.topicMeta];
+        this.requestUpdate();
+    }
+    beginInterviewRequest(question, routing = 'auto') {
+        const { isFollowup } = window.require('./utils/interview-workflow');
+        const viewed = this.currentResponseIndex;
+        let index = this.currentResponseIndex;
+        if (routing === 'auto') {
+            index = -1;
+            for (let i = this.topicMeta.length - 1; i >= 0; i--) {
+                if (!this.topicMeta[i].hidden && isFollowup(question, this.topicMeta[i].question || this.topicMeta[i].title)) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        if (routing === 'new' || index < 0) {
+            this.openResponseCard();
+            index = this.currentResponseIndex;
+        }
+        this.currentResponseIndex = index;
+        this.editTopic(index, { title: this.topicMeta[index]?.title || question.slice(0, 80), question, read: false });
+        const request = this.beginManualRequest(question);
+        // Incoming audio questions do not force the reader away from their card.
+        if (routing === 'auto' && viewed >= 0) this.currentResponseIndex = viewed;
+        return request;
+    }
+    deleteTopic(index) {
+        if (!this.topicMeta[index] || this.topicMeta[index].hidden) return;
+        this.editTopic(index, { hidden: true, deleted: true });
+        this._baseResponses.delete(index);
+        this.responses = this.responses.map((text, i) => (i === index ? '' : text));
+        for (const request of this._inlineRequests.values()) if (request.index === index) request.text = '';
+        if (this.currentResponseIndex === index) {
+            this.currentResponseIndex = this.topicMeta.findIndex(m => !m.hidden);
+            if (this.currentResponseIndex < 0) this.openResponseCard();
+        }
+        this.requestUpdate();
+    }
+    mergeTopic() {
+        const source = this.currentResponseIndex;
+        let target = source - 1;
+        while (target >= 0 && this.topicMeta[target]?.hidden) target--;
+        if (target < 0) return;
+        this._baseResponses.set(target, [this._baseResponses.get(target), this._baseResponses.get(source)].filter(Boolean).join('\n\n---\n\n'));
+        for (const request of this._inlineRequests.values()) if (request.index === source) request.index = target;
+        for (const [id, index] of this._responseIds) if (index === source) this._responseIds.set(id, target);
+        this.editTopic(source, { hidden: true });
+        this.currentResponseIndex = target;
+        this._renderResponse(target);
+    }
+    splitTopic() {
+        const source = this.currentResponseIndex;
+        const entry = [...this._inlineRequests.values()].filter(r => r.index === source).at(-1);
+        if (!entry) return;
+        this.openResponseCard();
+        entry.index = this.currentResponseIndex;
+        this.editTopic(this.currentResponseIndex, { title: entry.question.slice(0, 80), question: entry.question });
+        this._renderResponse(source);
+        this._renderResponse(this.currentResponseIndex);
+    }
+    openResponseCard() {
+        this.addNewResponse('');
+        this.currentResponseIndex = this.responses.length - 1;
+        this.requestUpdate();
+    }
+
+    beginManualRequest(question) {
+        if (this.currentResponseIndex < 0) this.addNewResponse('');
+        const id = crypto.randomUUID();
+        const index = this.currentResponseIndex;
+        const context = this.responses[index].slice(-30000);
+        this._inlineRequests.set(id, { index, question, text: 'Ожидаю ответ…' });
+        this._renderResponse(index);
+        this._manualRequestRevision++;
+        return { requestId: id, context };
+    }
+
+    _renderResponse(index) {
+        const base = this._baseResponses.get(index) || '';
+        const followups = [...this._inlineRequests.values()]
+            .filter(item => item.index === index)
+            .map(item => {
+                const question = item.question.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '\n> ');
+                return `> ${question}\n\n${item.text}`;
+            });
+        const text = [base, ...followups].filter(Boolean).join('\n\n---\n\n');
+        this.responses = this.responses.map((value, i) => (i === index ? text : value));
+        this.requestUpdate();
+    }
+
+    addNewResponse(response) {
+        const id = typeof response === 'object' ? response.id : null;
+        const text = typeof response === 'object' ? response.text : response;
+        if (typeof text !== 'string') return;
+        if (id && (this._responseIds.has(id) || this._inlineRequests.has(id))) {
+            this.updateCurrentResponse(response);
+            return;
+        }
+        const index = this.responses.length;
+        if (id) this._responseIds.set(id, index);
+        this._baseResponses.set(index, text);
+        this.responses = [...this.responses, text];
+        this.topicMeta ||= [];
+        this.topicMeta = [...this.topicMeta, { title: text.slice(0, 70), read: false, pinned: false, hidden: false }];
+        // Only audio turns create a new card. Manual answers stay at their origin.
+        if (this.currentResponseIndex === -1) this.currentResponseIndex = 0;
         this._awaitingNewResponse = false;
         this.requestUpdate();
     }
 
     updateCurrentResponse(response) {
-        if (this.responses.length > 0) {
-            this.responses = [...this.responses.slice(0, -1), response];
-        } else {
-            this.addNewResponse(response);
+        const id = typeof response === 'object' ? response.id : null;
+        const text = typeof response === 'object' ? response.text : response;
+        if (typeof text !== 'string') return;
+        const inline = id && this._inlineRequests.get(id);
+        if (inline) {
+            if (this.topicMeta?.[inline.index]?.deleted) return;
+            inline.text = text;
+            this._renderResponse(inline.index);
+            this._awaitingNewResponse = false;
+            return;
         }
-        this.requestUpdate();
+        if ((id && !this._responseIds.has(id)) || !this.responses.length) {
+            this.addNewResponse(response);
+            return;
+        }
+        const index = id ? this._responseIds.get(id) : this.responses.length - 1;
+        if (this.topicMeta?.[index]?.deleted) return;
+        this._baseResponses.set(index, text);
+        this._renderResponse(index);
     }
 
     // ── Navigation ──
 
-    navigate(view) {
+    async navigate(view) {
+        if (view !== 'assistant' && (this.sessionActive || this._starting)) await this.endSession();
         this.currentView = view;
         this.requestUpdate();
     }
 
-    async handleClose() {
-        if (this.currentView === 'assistant') {
-            cheatingDaddy.stopCapture();
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('close-session');
-            }
-            this.sessionActive = false;
-            this._stopTimer();
-            this.currentView = 'main';
-        } else {
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('quit-application');
-            }
+    recoverySnapshot() {
+        const view = this.shadowRoot?.querySelector('assistant-view');
+        const tools = view?.shadowRoot?.querySelector('interview-tools');
+        return {
+            version: 1,
+            savedAt: Date.now(),
+            sessionId: this._sessionId,
+            provider: this._sessionProvider,
+            profile: this.selectedProfile,
+            language: this.selectedLanguage,
+            focus: !!this.focusMode,
+            paused: !!this._isPaused,
+            responses: this.responses,
+            topicMeta: this.topicMeta,
+            index: this.currentResponseIndex,
+            base: [...this._baseResponses],
+            inline: [...this._inlineRequests],
+            ids: [...this._responseIds],
+            draft: view?.shadowRoot?.querySelector('#textInput')?.value || '',
+            scroll: view?.shadowRoot?.querySelector('#responseContainer')?.scrollTop || 0,
+            questions: tools?.inbox || [],
+            questionId: tools?.questionId || '',
+            questionText: tools?.questionText || '',
+            questionRevision: tools?.revision,
+            toolState: tools
+                ? {
+                      tab: tools.tab,
+                      collapsed: tools.collapsed,
+                      code: tools.code,
+                      tests: tools.tests,
+                      language: tools.language,
+                      files: tools.files,
+                      imageMode: tools.imageMode,
+                  }
+                : null,
+        };
+    }
+    async persistRecovery() {
+        if (!this.sessionActive || !this.hostedMode || this._restoring || this._savingRecovery || !this._sessionId) return;
+        this._savingRecovery = true;
+        try {
+            const snapshot = this.recoverySnapshot();
+            const comparable = JSON.stringify({ ...snapshot, savedAt: 0 });
+            if (comparable === this._lastRecoveryText) return;
+            const result = await window.require('electron').ipcRenderer.invoke('session:recovery-save', snapshot);
+            if (!result.success) throw Error(result.error);
+            this._lastRecoveryText = comparable;
+        } catch (e) {
+            this.setStatus('Не удалось сохранить сессию: ' + e.message);
+        } finally {
+            this._savingRecovery = false;
         }
+    }
+    async discardRecovery() {
+        const result = await window.require('electron').ipcRenderer.invoke('session:recovery-save', null);
+        if (result.success) this.recovery = null;
+        else this._startError = result.error;
+    }
+    async resumeSession() {
+        if (!this.recovery || this._preflightBusy) return;
+        this._resumeSnapshot = this.recovery;
+        await cheatingDaddy.storage.updatePreference('providerMode', this.recovery.provider);
+        this.selectedProfile = this.recovery.profile || 'interview';
+        this.selectedLanguage = this.recovery.language || 'ru-RU';
+        await this.handleStart();
+    }
+    async restoreRecovery(snapshot) {
+        this.responses = [...snapshot.responses];
+        this.topicMeta = [...snapshot.topicMeta];
+        this.currentResponseIndex = snapshot.index;
+        this.focusMode = snapshot.focus;
+        this._baseResponses = new Map(snapshot.base);
+        this._responseIds = new Map(snapshot.ids);
+        this._inlineRequests = new Map(snapshot.inline);
+        for (const request of this._inlineRequests.values())
+            if (request.state === 'pending') {
+                request.state = 'failed';
+                request.error = 'Сессия прервалась. Запрос можно повторить.';
+            }
+        this._restoredTools = snapshot;
+        this.requestUpdate();
+        await this.updateComplete;
+        const view = this.shadowRoot.querySelector('assistant-view');
+        await view?.updateComplete;
+        if (view) {
+            const tools = view.shadowRoot.querySelector('interview-tools');
+            if (tools?._loaded && this._restoredTools) {
+                tools.restoreDraft(snapshot);
+                this._restoredTools = null;
+            }
+            const input = view.shadowRoot.querySelector('#textInput');
+            if (input) input.value = snapshot.draft;
+            const container = view.shadowRoot.querySelector('#responseContainer');
+            if (container) container.scrollTop = snapshot.scroll;
+        }
+        if (snapshot.paused && !this._isPaused) await this.togglePause();
+        this.recovery = null;
+    }
+    async endSession() {
+        if (this._ending) return;
+        this._ending = true;
+        const finishedId = this._sessionId;
+        ++this._sessionGeneration;
+        // Release UI guards even if capture or an IPC call fails during teardown.
+        this.sessionActive = false;
+        this._starting = false;
+        this._isPaused = false;
+        this._pausePending = false;
+        this._stopTimer();
+        this.currentView = 'main';
+        try {
+            cheatingDaddy.stopCapture();
+        } catch (error) {
+            this.setStatus(error.message);
+        }
+        try {
+            if (window.require) {
+                const ipc = window.require('electron').ipcRenderer;
+                await ipc.invoke('close-session');
+                if (finishedId && !this._restoring) {
+                    await ipc.invoke('session:recovery-save', null);
+                    this.recovery = null;
+                    this._sessionId = null;
+                    this._lastFinishedSessionId = finishedId;
+                    const report = await ipc.invoke('session:review', finishedId);
+                    this.lastReview = report.success ? report.data : null;
+                }
+            }
+        } catch (error) {
+            this.setStatus(error.message);
+        } finally {
+            this._ending = false;
+        }
+    }
+
+    async handleClose() {
+        if (this.currentView === 'assistant' || this.sessionActive || this._starting) await this.endSession();
+        else if (window.require) await window.require('electron').ipcRenderer.invoke('quit-application');
     }
 
     async _handleMinimize() {
@@ -596,8 +892,33 @@ export class CheatingDaddyApp extends LitElement {
     // ── Session start ──
 
     async handleStart() {
+        if (this._starting || this._ending || this.sessionActive || this._preflightBusy) return;
+        if (this.recovery && !this._resumeSnapshot) {
+            this._startError = 'Выберите «Продолжить сессию» или «Начать заново»';
+            return;
+        }
+        this._starting = true;
+        const generation = ++this._sessionGeneration;
+        this._startError = '';
+        try {
+            this._restoring = !!this._resumeSnapshot;
+            await this._startSession(generation);
+            if (this.sessionActive && this._resumeSnapshot) await this.restoreRecovery(this._resumeSnapshot);
+        } catch (error) {
+            if (generation === this._sessionGeneration) this._startError = error.message;
+        } finally {
+            this._resumeSnapshot = null;
+            this._restoring = false;
+            if (generation === this._sessionGeneration) this._starting = false;
+        }
+    }
+
+    async _startSession(generation) {
         const prefs = await cheatingDaddy.storage.getPreferences();
+        if (generation !== this._sessionGeneration) return;
         const providerMode = prefs.providerMode === 'cloud' ? 'byok' : prefs.providerMode || 'byok';
+        this.hostedMode = ['openai', 'openrouter'].includes(providerMode);
+        this._sessionProvider = providerMode;
 
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
@@ -615,6 +936,23 @@ export class CheatingDaddyApp extends LitElement {
                 if (mainView && mainView.triggerApiKeyError) {
                     mainView.triggerApiKeyError();
                 }
+                return;
+            }
+        } else if (providerMode === 'openai' || providerMode === 'openrouter') {
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('initialize-hosted', {
+                provider: providerMode,
+                profile: this.selectedProfile,
+                language: this.selectedLanguage,
+                customPrompt: prefs.customPrompt || '',
+                resumeSessionId: this._resumeSnapshot?.sessionId,
+                recoveredQuestions: this._resumeSnapshot?.questions,
+            });
+            this._sessionId = result.sessionId;
+            if (!result.success) {
+                this._startError = result.error;
+                this.setStatus(result.error);
+                this.shadowRoot.querySelector('main-view')?.triggerApiKeyError();
                 return;
             }
         } else if (providerMode === 'local') {
@@ -636,16 +974,28 @@ export class CheatingDaddyApp extends LitElement {
                 return;
             }
 
-            await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            const success = await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            if (!success) return;
         }
 
-        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        if (generation !== this._sessionGeneration) return;
+        this._isPaused = false;
+        this._responseIds.clear();
+        this._inlineRequests.clear();
+        this._baseResponses.clear();
         this.responses = [];
+        this.topicMeta = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.sessionActive = true;
         this.currentView = 'assistant';
         this._startTimer();
+        const captured = await cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        if (generation !== this._sessionGeneration) return;
+        if (!captured) {
+            this._startError = 'Capture failed. Check screen recording and microphone permissions, then start again.';
+            await this.handleClose();
+        }
     }
 
     async handleCancelLocalDownload() {
@@ -702,12 +1052,19 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleSendText(message) {
-        const result = await window.cheatingDaddy.sendTextMessage(message);
-        if (!result.success) {
-            this.setStatus('Error sending message: ' + result.error);
-        } else {
-            this.setStatus('Message sent...');
-            this._awaitingNewResponse = true;
+        const request = this.beginManualRequest(message);
+        this._awaitingNewResponse = true;
+        try {
+            const result = await window.cheatingDaddy.sendTextMessage(message, request);
+            if (!result.success) {
+                this._awaitingNewResponse = false;
+                this.updateCurrentResponse({ id: request.requestId, text: 'Ошибка: ' + result.error });
+                this.setStatus('Error sending message: ' + result.error);
+            }
+        } catch (error) {
+            this._awaitingNewResponse = false;
+            this.updateCurrentResponse({ id: request.requestId, text: 'Ошибка: ' + error.message });
+            this.setStatus('Error sending message: ' + error.message);
         }
     }
 
@@ -747,15 +1104,20 @@ export class CheatingDaddyApp extends LitElement {
 
             case 'main':
                 return html`
-                    <main-view
-                        .selectedProfile=${this.selectedProfile}
-                        .onProfileChange=${p => this.handleProfileChange(p)}
-                        .onStart=${() => this.handleStart()}
-                        .onExternalLink=${url => this.handleExternalLinkClick(url)}
-                        .whisperDownloading=${this._whisperDownloading}
-                        .downloadProgress=${this._localAiDownloadProgress}
-                        .onCancelDownload=${() => this.handleCancelLocalDownload()}
-                    ></main-view>
+                    <div class="home-content">
+                        <session-console .recovery=${this.recovery} .review=${this.lastReview}></session-console>
+                        <main-view
+                            .isInitializing=${this._starting || this._ending || this._preflightBusy}
+                            .errorMessage=${this._startError}
+                            .selectedProfile=${this.selectedProfile}
+                            .onProfileChange=${p => this.handleProfileChange(p)}
+                            .onStart=${() => this.handleStart()}
+                            .onExternalLink=${url => this.handleExternalLinkClick(url)}
+                            .whisperDownloading=${this._whisperDownloading}
+                            .downloadProgress=${this._localAiDownloadProgress}
+                            .onCancelDownload=${() => this.handleCancelLocalDownload()}
+                        ></main-view>
+                    </div>
                 `;
 
             case 'ai-customize':
@@ -782,18 +1144,22 @@ export class CheatingDaddyApp extends LitElement {
                     ></customize-view>
                 `;
 
-            case 'feedback':
-                return html`<feedback-view></feedback-view>`;
-
             case 'help':
                 return html`<help-view .onExternalLinkClick=${url => this.handleExternalLinkClick(url)}></help-view>`;
 
+            case 'preparation':
+                return html`<interview-tools .preparationOnly=${true}></interview-tools>`;
+
             case 'history':
-                return html`<history-view></history-view>`;
+                return html`<history-view .initialReviewId=${this._reviewToOpen || ''}></history-view>`;
 
             case 'assistant':
                 return html`
                     <assistant-view
+                        .focusMode=${this.focusMode}
+                        .paused=${this._isPaused}
+                        .hostedMode=${this.hostedMode}
+                        .manualRequestRevision=${this._manualRequestRevision}
                         .responses=${this.responses}
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
@@ -842,6 +1208,15 @@ export class CheatingDaddyApp extends LitElement {
                 </svg>`,
             },
             {
+                id: 'preparation',
+                label: 'Preparation',
+                icon: html`<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                    <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 5v16M3 3h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5v16h-5a4 4 0 0 0-4 2 4 4 0 0 0-4-2H3z" />
+                    </g>
+                </svg>`,
+            },
+            {
                 id: 'history',
                 label: 'History',
                 icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
@@ -862,16 +1237,6 @@ export class CheatingDaddyApp extends LitElement {
                             d="M19.875 6.27A2.23 2.23 0 0 1 21 8.218v7.284c0 .809-.443 1.555-1.158 1.948l-6.75 4.27a2.27 2.27 0 0 1-2.184 0l-6.75-4.27A2.23 2.23 0 0 1 3 15.502V8.217c0-.809.443-1.554 1.158-1.947l6.75-3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98z"
                         />
                         <path d="M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0" />
-                    </g>
-                </svg>`,
-            },
-            {
-                id: 'feedback',
-                label: 'Feedback',
-                icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
-                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                        <path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-5l-5 3v-3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM9.5 9h.01m4.99 0h.01" />
-                        <path d="M9.5 13a3.5 3.5 0 0 0 5 0" />
                     </g>
                 </svg>`,
             },
@@ -905,27 +1270,7 @@ export class CheatingDaddyApp extends LitElement {
                         `
                     )}
                 </nav>
-                <div class="sidebar-footer">
-                    ${
-                        this._updateAvailable
-                            ? html`
-                                  <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com/download')}>
-                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                          <path
-                                              fill="none"
-                                              stroke="currentColor"
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5l5-5m-5-7v12"
-                                          />
-                                      </svg>
-                                      Update available
-                                  </button>
-                              `
-                            : html` <div class="version-text">v${this._localVersion}</div> `
-                    }
-                </div>
+                <div class="sidebar-footer"><div class="version-text">v${this._localVersion}</div></div>
             </div>
         `;
     }
@@ -959,6 +1304,30 @@ export class CheatingDaddyApp extends LitElement {
                 <div class="live-bar-right">
                     ${this.statusText ? html`<span class="live-bar-text">${this.statusText}</span>` : ''}
                     <span class="live-bar-text">${this.getElapsedTime()}</span>
+                    <button
+                        class="live-bar-text clickable"
+                        ?disabled=${this._pausePending}
+                        aria-pressed=${this._isPaused}
+                        title="Pause audio (Cmd/Ctrl+P). Text and Analyze Screen remain available."
+                        @click=${() => this.togglePause()}
+                    >
+                        ${this._isPaused ? '[resume]' : '[pause]'}
+                    </button>
+                    ${
+                        this.responses.filter((_, i) => i > this.currentResponseIndex && !this.topicMeta[i]?.hidden).length > 0
+                            ? html` <button
+                                  class="live-bar-text clickable"
+                                  @click=${() => {
+                                      let next = this.currentResponseIndex + 1;
+                                      while (next < this.responses.length && this.topicMeta[next]?.hidden) next++;
+                                      if (next < this.responses.length) this.currentResponseIndex = next;
+                                  }}
+                              >
+                                  [next · ${this.responses.filter((_, i) => i > this.currentResponseIndex && !this.topicMeta[i]?.hidden).length}
+                                  waiting]
+                              </button>`
+                            : ''
+                    }
                     ${this._isClickThrough ? html`<span class="live-bar-text">[click through]</span>` : ''}
                     <span class="live-bar-text clickable" @click=${() => this.handleHideToggle()}>[hide]</span>
                 </div>
@@ -986,7 +1355,7 @@ export class CheatingDaddyApp extends LitElement {
                 </div>
                 ${this.renderSidebar()}
                 <div class="content">
-                    ${isLive ? this.renderLiveBar() : ''}
+                    ${isLive && !this.focusMode ? this.renderLiveBar() : ''}
                     <div class="content-inner ${isLive ? 'live' : ''}">${this.renderCurrentView()}</div>
                 </div>
             </div>

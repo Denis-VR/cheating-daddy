@@ -5,6 +5,15 @@ export class HistoryView extends LitElement {
     static styles = [
         unifiedPageStyles,
         css`
+            .history-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .history-row .session-card {
+                flex: 1;
+                min-width: 0;
+            }
             .unified-page {
                 overflow-y: hidden;
             }
@@ -261,6 +270,8 @@ export class HistoryView extends LitElement {
     static properties = {
         sessions: { type: Array },
         selectedSession: { type: Object },
+        initialReviewId: { type: String },
+        review: { state: true },
         selectedSessionId: { type: String },
         loading: { type: Boolean },
         activeTab: { type: String },
@@ -278,6 +289,14 @@ export class HistoryView extends LitElement {
         this.loadSessions();
     }
 
+    updated(changed) {
+        if (changed.has('initialReviewId') && this.initialReviewId) {
+            const id = this.initialReviewId;
+            this.openSession(id).then(() => {
+                if (this.selectedSessionId === id) this.activeTab = 'review';
+            });
+        }
+    }
     async loadSessions() {
         try {
             this.loading = true;
@@ -297,11 +316,34 @@ export class HistoryView extends LitElement {
             if (session) {
                 this.selectedSession = session;
                 this.selectedSessionId = sessionId;
+                const result = await window.require('electron').ipcRenderer.invoke('session:review', sessionId);
+                if (this.selectedSessionId !== sessionId) return;
+                this.review = result.success ? result.data : null;
                 this.activeTab = 'conversation';
                 this.requestUpdate();
             }
         } catch (error) {
             console.error('Error loading session:', error);
+        }
+    }
+
+    async deleteHistory(id = null) {
+        if (this._deleting) return;
+        const message = id ? 'Удалить эту сессию из истории?' : 'Удалить всю историю сессий? Это действие нельзя отменить.';
+        if (!window.confirm(message)) return;
+        this._deleting = true;
+        try {
+            const result = id ? await cheatingDaddy.storage.deleteSession(id) : await cheatingDaddy.storage.deleteAllSessions();
+            if (!result.success) {
+                window.alert(result.error || 'Не удалось удалить историю');
+                return;
+            }
+            this.closeSession();
+            await this.loadSessions();
+        } catch (error) {
+            window.alert(error.message);
+        } finally {
+            this._deleting = false;
         }
     }
 
@@ -383,30 +425,55 @@ export class HistoryView extends LitElement {
     renderTabContent() {
         if (!this.selectedSession) return html`<div class="empty">Select a session.</div>`;
 
+        if (this.activeTab === 'review')
+            return html`<p>${this.review?.note || 'Разбор недоступен'}</p>
+                ${[
+                    ['difficult', 'Что стоит повторить'],
+                    ['verify', 'Какие ответы перепроверить'],
+                    ['tomorrow', 'План на завтра'],
+                ].map(
+                    ([key, title]) =>
+                        html`<h3>${title}</h3>
+                            <ul>
+                                ${(this.review?.[key] || []).map(
+                                    item =>
+                                        html`<li>
+                                            <strong>${item.topic}</strong>
+                                            <p>${item.task || item.reason}</p>
+                                            ${item.evidence ? html`<small>Основание: ${item.evidence}</small>` : ''}
+                                        </li>`
+                                )}
+                            </ul>
+                            ${!this.review?.[key]?.length ? html`<p>Недостаточно данных для вывода.</p>` : ''}`
+                )}`;
         if (this.activeTab === 'conversation') {
             const messages = this.collectConversation(this.selectedSession);
             if (!messages.length) return html`<div class="empty">No conversation data.</div>`;
-            return messages.map(msg => html`
-                <div class="message-row ${msg.type}">
-                    <div class="message">
-                        <div class="message-body">${msg.content}</div>
-                        <div class="message-meta">${this.formatTime(msg.timestamp)}</div>
+            return messages.map(
+                msg => html`
+                    <div class="message-row ${msg.type}">
+                        <div class="message">
+                            <div class="message-body">${msg.content}</div>
+                            <div class="message-meta">${this.formatTime(msg.timestamp)}</div>
+                        </div>
                     </div>
-                </div>
-            `);
+                `
+            );
         }
 
         if (this.activeTab === 'screen') {
             const screen = this.selectedSession.screenAnalysisHistory || [];
             if (!screen.length) return html`<div class="empty">No screen analysis data.</div>`;
-            return screen.map(entry => html`
-                <div class="message-row screen">
-                    <div class="message">
-                        <div class="message-body">${entry.response || ''}</div>
-                        <div class="message-meta">${this.formatTime(entry.timestamp)}</div>
+            return screen.map(
+                entry => html`
+                    <div class="message-row screen">
+                        <div class="message">
+                            <div class="message-body">${entry.response || ''}</div>
+                            <div class="message-meta">${this.formatTime(entry.timestamp)}</div>
+                        </div>
                     </div>
-                </div>
-            `);
+                `
+            );
         }
 
         const profile = this.selectedSession.profile;
@@ -414,18 +481,26 @@ export class HistoryView extends LitElement {
         if (!profile && !prompt) return html`<div class="empty">No context saved for this session.</div>`;
 
         return html`
-            ${profile ? html`
-                <div class="context-row">
-                    <span class="context-key">Profile</span>
-                    <span class="context-value">${this.getProfileNames()[profile] || profile}</span>
-                </div>
-            ` : ''}
-            ${prompt ? html`
-                <div class="context-row">
-                    <span class="context-key">Prompt</span>
-                    <span class="context-value">${prompt}</span>
-                </div>
-            ` : ''}
+            ${
+                profile
+                    ? html`
+                          <div class="context-row">
+                              <span class="context-key">Profile</span>
+                              <span class="context-value">${this.getProfileNames()[profile] || profile}</span>
+                          </div>
+                      `
+                    : ''
+            }
+            ${
+                prompt
+                    ? html`
+                          <div class="context-row">
+                              <span class="context-key">Prompt</span>
+                              <span class="context-value">${prompt}</span>
+                          </div>
+                      `
+                    : ''
+            }
         `;
     }
 
@@ -433,34 +508,49 @@ export class HistoryView extends LitElement {
         const filteredSessions = this.getFilteredSessions();
         return html`
             <div class="page-title">History</div>
+            <button class="tab-btn" ?disabled=${!this.sessions.length || this.loading} @click=${() => this.deleteHistory()}>
+                Удалить всю историю
+            </button>
 
             <div class="search-wrap">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8"/>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <svg
+                    class="search-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <input
-                    class="control"
-                    type="text"
-                    placeholder="Search sessions..."
-                    .value=${this.searchQuery}
-                    @input=${this.handleSearchInput}
-                />
+                <input class="control" type="text" placeholder="Search sessions..." .value=${this.searchQuery} @input=${this.handleSearchInput} />
             </div>
 
             <section class="list-shell">
                 <div class="sessions-list">
                     ${this.loading ? html`<div class="empty" style="margin:var(--space-md);">Loading sessions...</div>` : ''}
                     ${!this.loading && filteredSessions.length === 0 ? html`<div class="empty" style="margin:var(--space-md);">No matching sessions.</div>` : ''}
-                    ${!this.loading ? filteredSessions.map(session => html`
-                        <button class="session-card" @click=${() => this.openSession(session.sessionId)}>
-                            <div class="session-left">
-                                <span class="session-profile">${this._getProfileLabel(session)}</span>
-                                <span class="session-date">${this.formatDate(session.createdAt)} · ${this.formatTime(session.createdAt)}</span>
-                            </div>
-                            ${session.messageCount > 0 ? html`<span class="session-badge">${session.messageCount}</span>` : ''}
-                        </button>
-                    `) : ''}
+                    ${
+                        !this.loading
+                            ? filteredSessions.map(
+                                  session => html`
+                                      <div class="history-row">
+                                          <button class="session-card" @click=${() => this.openSession(session.sessionId)}>
+                                              <div class="session-left">
+                                                  <span class="session-profile">${this._getProfileLabel(session)}</span>
+                                                  <span class="session-date"
+                                                      >${this.formatDate(session.createdAt)} · ${this.formatTime(session.createdAt)}</span
+                                                  >
+                                              </div>
+                                              ${session.messageCount > 0 ? html`<span class="session-badge">${session.messageCount}</span>` : ''}</button
+                                          ><button class="tab-btn" @click=${() => this.deleteHistory(session.sessionId)}>Удалить</button>
+                                      </div>
+                                  `
+                              )
+                            : ''
+                    }
                 </div>
             </section>
         `;
@@ -472,37 +562,69 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="page-title">Session Detail</div>
+            <button class="tab-btn" @click=${() => this.deleteHistory(this.selectedSessionId)}>Удалить сессию</button>
             <div class="detail-top">
                 <button class="back-btn" @click=${this.closeSession}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="15 18 9 12 15 6"/>
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <polyline points="15 18 9 12 15 6" />
                     </svg>
                 </button>
-                <span class="detail-info">${this._getProfileLabel(this.selectedSession)} · ${this.formatDate(this.selectedSession.createdAt)} · ${this.formatTime(this.selectedSession.createdAt)}</span>
+                <span class="detail-info"
+                    >${this._getProfileLabel(this.selectedSession)} · ${this.formatDate(this.selectedSession.createdAt)} ·
+                    ${this.formatTime(this.selectedSession.createdAt)}</span
+                >
             </div>
             <div class="tab-row">
-                <button class="tab-btn ${this.activeTab === 'conversation' ? 'active' : ''}" @click=${() => { this.activeTab = 'conversation'; }}>
+                <button
+                    class="tab-btn"
+                    @click=${() => {
+                        this.activeTab = 'review';
+                    }}
+                >
+                    Разбор
+                </button>
+                <button
+                    class="tab-btn ${this.activeTab === 'conversation' ? 'active' : ''}"
+                    @click=${() => {
+                        this.activeTab = 'conversation';
+                    }}
+                >
                     Conversation (${conversationCount})
                 </button>
-                <button class="tab-btn ${this.activeTab === 'screen' ? 'active' : ''}" @click=${() => { this.activeTab = 'screen'; }}>
+                <button
+                    class="tab-btn ${this.activeTab === 'screen' ? 'active' : ''}"
+                    @click=${() => {
+                        this.activeTab = 'screen';
+                    }}
+                >
                     Screen (${screenCount})
                 </button>
-                <button class="tab-btn ${this.activeTab === 'context' ? 'active' : ''}" @click=${() => { this.activeTab = 'context'; }}>
+                <button
+                    class="tab-btn ${this.activeTab === 'context' ? 'active' : ''}"
+                    @click=${() => {
+                        this.activeTab = 'context';
+                    }}
+                >
                     Context
                 </button>
             </div>
-            <section class="details-scroll">
-                ${this.renderTabContent()}
-            </section>
+            <section class="details-scroll">${this.renderTabContent()}</section>
         `;
     }
 
     render() {
         return html`
             <div class="unified-page">
-                <div class="unified-wrap">
-                    ${this.selectedSession ? this.renderDetailView() : this.renderListView()}
-                </div>
+                <div class="unified-wrap">${this.selectedSession ? this.renderDetailView() : this.renderListView()}</div>
             </div>
         `;
     }

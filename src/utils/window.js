@@ -11,6 +11,12 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     let windowWidth = DEFAULT_MAIN_WINDOW_SIZE.width;
     let windowHeight = DEFAULT_MAIN_WINDOW_SIZE.height;
 
+    const saved = storage.getConfig().windowBounds;
+    const area = screen.getPrimaryDisplay().workArea;
+    if (saved && Number.isFinite(saved.width) && Number.isFinite(saved.height)) {
+        windowWidth = Math.max(MIN_WINDOW_SIZE.width, Math.min(saved.width, area.width));
+        windowHeight = Math.max(MIN_WINDOW_SIZE.height, Math.min(saved.height, area.height));
+    }
     const mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
@@ -31,6 +37,12 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         },
         backgroundColor: '#00000000',
     });
+
+    const saveBounds = () => {
+        if (!mainWindow.isDestroyed()) storage.setConfig({ windowBounds: mainWindow.getNormalBounds() });
+    };
+    mainWindow.on('resize', saveBounds);
+    mainWindow.on('close', saveBounds);
 
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
@@ -103,6 +115,9 @@ function getDefaultKeybinds() {
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+        focusMode: isMac ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
+        increaseFont: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
+        decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
@@ -112,7 +127,46 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     // Unregister all existing shortcuts
     globalShortcut.unregisterAll();
+    if (keybinds.focusMode) globalShortcut.register(keybinds.focusMode, () => sendToRenderer('toggle-focus-mode'));
+    globalShortcut.register('CommandOrControl+P', () => sendToRenderer('toggle-session-pause'));
 
+    for (const [action, step] of [
+        ['increaseFont', 2],
+        ['decreaseFont', -2],
+    ]) {
+        if (keybinds[action]) {
+            try {
+                globalShortcut.register(keybinds[action], () => sendToRenderer('response-font-step', step));
+            } catch (error) {
+                console.error('Font shortcut unavailable:', error.message);
+            }
+        }
+    }
+    if (mainWindow._fontInputHandler) mainWindow.webContents.removeListener?.('before-input-event', mainWindow._fontInputHandler);
+    mainWindow._fontInputHandler = (event, input) => {
+        if (input.type !== 'keyDown') return;
+        for (const [action, step] of [
+            ['increaseFont', 2],
+            ['decreaseFont', -2],
+            ['focusMode', 'focus'],
+        ]) {
+            const parts = (keybinds[action] || '').toLowerCase().split('+');
+            const key = parts.pop();
+            const actual = input.key.toLowerCase().replace(/^arrow/, '');
+            if (
+                key !== actual ||
+                !!input.meta !== parts.includes('cmd') ||
+                !!input.control !== parts.includes('ctrl') ||
+                !!input.alt !== parts.includes('alt') ||
+                !!input.shift !== parts.includes('shift')
+            )
+                continue;
+            event.preventDefault();
+            if (step === 'focus') sendToRenderer('toggle-focus-mode');
+            else sendToRenderer('response-font-step', step);
+        }
+    };
+    mainWindow.webContents.on?.('before-input-event', mainWindow._fontInputHandler);
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
     const moveIncrement = Math.floor(Math.min(width, height) * 0.1);
@@ -293,6 +347,35 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
+    ipcMain.removeHandler('capture-screen-draft');
+    let screenCapturePending = false;
+    ipcMain.handle('capture-screen-draft', async event => {
+        if (event.sender !== mainWindow.webContents) return { success: false, error: 'Недоступный источник запроса' };
+        if (screenCapturePending) return { success: false, error: 'Снимок уже создаётся' };
+        screenCapturePending = true;
+        let timeout;
+        try {
+            const { desktopCapturer, systemPreferences } = require('electron');
+            if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') === 'denied')
+                throw new Error('Разрешите запись экрана для Cheating Daddy в настройках macOS и перезапустите приложение');
+            const sources = await Promise.race([
+                desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1920, height: 1080 }, fetchWindowIcons: false }),
+                new Promise((_, reject) => {
+                    timeout = setTimeout(() => reject(new Error('Снимок не получен за 10 секунд. Проверьте разрешение записи экрана macOS.')), 10000);
+                }),
+            ]);
+            const display = screen.getDisplayMatching(mainWindow.getBounds());
+            const source = sources.find(item => item.display_id === String(display.id)) || sources[0];
+            if (!source || source.thumbnail.isEmpty()) throw new Error('Пустой снимок. Проверьте разрешение записи экрана macOS.');
+            return { success: true, data: source.thumbnail.toJPEG(90).toString('base64') };
+        } catch (error) {
+            return { success: false, error: error.message };
+        } finally {
+            clearTimeout(timeout);
+            screenCapturePending = false;
+        }
+    });
+
     ipcMain.on('view-changed', (event, view) => {
         if (!mainWindow.isDestroyed()) {
             const isLiveMode = view === 'assistant';

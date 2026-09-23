@@ -486,6 +486,14 @@ function processLocalAudio(monoChunk24k) {
     }
 }
 
+function resetAudioBuffer() {
+    isSpeaking = false;
+    speechBuffers = [];
+    silenceFrameCount = 0;
+    speechFrameCount = 0;
+    resampleRemainder = Buffer.alloc(0);
+}
+
 function closeLocalSession() {
     isLocalActive = false;
     initializationController?.abort();
@@ -593,6 +601,7 @@ module.exports = {
     initializeLocalSession,
     cancelLocalInitialization,
     processLocalAudio,
+    resetAudioBuffer,
     closeLocalSession,
     isLocalSessionActive,
     sendLocalText,
