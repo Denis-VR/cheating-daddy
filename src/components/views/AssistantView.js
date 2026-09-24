@@ -6,6 +6,15 @@ const DEFAULT_QUICK_ACTIONS = ['Короче', 'Пример на Go', 'Поче
 
 export class AssistantView extends LitElement {
     static styles = css`
+        interview-tools[design-active] ~ .response-container,
+        interview-tools[design-active] ~ .response-nav,
+        interview-tools[design-active] ~ .input-bar,
+        interview-tools[design-active] ~ .quick-followups,
+        interview-tools[design-active] ~ .action-editor,
+        interview-tools[design-active] ~ .attachments {
+            display: none !important;
+        }
+
         :host {
             height: 100%;
             display: flex;

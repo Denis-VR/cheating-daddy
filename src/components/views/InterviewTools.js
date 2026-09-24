@@ -1,7 +1,9 @@
+import { layoutDiagram } from '../../utils/design-diagram.mjs';
 import { html, svg, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
 export class InterviewTools extends LitElement {
     static properties = {
+        diagramZoom: { state: true },
         preparationOnly: { type: Boolean, reflect: true },
         tab: { state: true },
         collapsed: { state: true },
@@ -143,7 +145,7 @@ export class InterviewTools extends LitElement {
             max-height: 240px;
         }
         .muted {
-            color: var(--text-muted);
+            color: var(--text-secondary, #b8b8b8);
         }
         .images {
             display: flex;
@@ -176,12 +178,186 @@ export class InterviewTools extends LitElement {
             height: 240px;
             background: var(--bg-elevated, #191919);
         }
+        :host([preparationOnly]) {
+            padding: 24px;
+        }
+        :host([preparationOnly]) .panel {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+        .prep-content {
+            display: grid;
+            gap: 18px;
+        }
+        .prep-content h2,
+        .design-header h2 {
+            margin: 0;
+            font-size: 22px;
+        }
+        .prep-content .bar {
+            padding: 0;
+        }
+        .prep-content .bar select {
+            flex: 1;
+            min-width: 160px;
+        }
+        .prep-content label,
+        .design-fields label,
+        .design-composer label {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            min-width: 0;
+            font-size: 14px;
+            color: var(--text-secondary, #b8b8b8);
+        }
+        .prep-content input,
+        .prep-content textarea,
+        .design-fields textarea {
+            width: 100%;
+            min-width: 0;
+        }
+        .prep-content textarea {
+            min-height: 180px;
+            line-height: 1.6;
+        }
+        .prep-content details {
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+        .prep-content .muted {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+        :host([design-active]) {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        :host([design-active]) .panel {
+            flex: 1;
+            min-height: 0;
+            max-height: none;
+            padding: 20px;
+        }
+        :host([design-active]) select[aria-label='Тема ответа'],
+        :host([design-active]) select[aria-label='Формат ответа'] {
+            display: none;
+        }
+        .design-workspace {
+            max-width: 1200px;
+            margin: auto;
+            display: grid;
+            gap: 20px;
+        }
+        .design-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .design-header .bar {
+            padding: 0;
+        }
+        .design-card {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--bg-elevated, #191919);
+            padding: 16px;
+            min-width: 0;
+        }
+        .design-card summary {
+            padding: 0;
+            font-size: 15px;
+        }
+        .design-card textarea {
+            margin-top: 12px;
+            line-height: 1.6;
+            min-height: 150px;
+            font-size: var(--response-font-size, 18px);
+        }
+        .design-composer {
+            display: grid;
+            gap: 10px;
+        }
+        .design-composer textarea {
+            min-height: 85px;
+            font-size: 17px;
+            line-height: 1.5;
+        }
+        .design-composer button {
+            justify-self: end;
+        }
+        .design-changes {
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: var(--response-font-size, 18px);
+        }
+        .diagram {
+            border-radius: 10px;
+            height: auto;
+            min-height: 180px;
+        }
+        @media (max-width: 620px) {
+            :host([preparationOnly]) {
+                padding: 12px;
+            }
+            :host([preparationOnly]) .panel,
+            :host([design-active]) .panel {
+                padding: 12px;
+            }
+            .grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+            .design-header h2 {
+                font-size: 20px;
+            }
+        }
+        .diagram-controls {
+            display: flex;
+            justify-content: flex-end;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+        .diagram-controls button {
+            font-size: 13px;
+            min-width: 30px;
+            padding: 4px 8px;
+        }
+        .diagram-scroll {
+            overflow: auto;
+            max-height: 65vh;
+            border-radius: 10px;
+            background: #191919;
+        }
+        .diagram-scroll .diagram {
+            display: block;
+            max-width: none;
+            min-height: 0;
+            margin: 0 auto;
+        }
         .primary {
             border-color: var(--accent);
         }
     `;
+    updated() {
+        this.toggleAttribute('design-active', !this.preparationOnly && this.tab === 'design' && !this.collapsed);
+    }
     constructor() {
         super();
+        this.diagramZoom = 1;
         this.tab = 'questions';
         this.collapsed = false;
         this.selectedTopics = [];
@@ -447,40 +623,142 @@ export class InterviewTools extends LitElement {
             };
             await this.call('workspace-save', next);
             this.workspace = next;
-            this.status = 'Схема обновлена. Изменения перечислены ниже.';
+            this.status = 'Проект обновлён';
+            this.constraint = '';
         });
     }
     diagram() {
-        const lines = (this.workspace.design.components || '').split(/[\n;]/);
-        const nodes = new Map(),
-            edges = [];
-        const parse = s => {
-            const m = s.trim().match(/^([\w-]+)(?:\["?([^\]"]+)"?\])?$/);
-            if (!m) return null;
-            nodes.set(m[1], m[2] || nodes.get(m[1]) || m[1]);
-            return m[1];
-        };
-        for (const line of lines) {
-            const parts = line.split('-->');
-            if (parts.length === 2) {
-                const a = parse(parts[0]),
-                    b = parse(parts[1]);
-                if (a && b) edges.push([a, b]);
-            } else if (!line.includes('flowchart')) parse(line);
+        let graph;
+        try {
+            const source = this.workspace.design.components || '';
+            if (this._diagramSource !== source) {
+                this._diagramLayout = layoutDiagram(source);
+                this._diagramSource = source;
+            }
+            graph = this._diagramLayout;
+        } catch (error) {
+            return html`<div role="alert">${error.message}</div>`;
         }
-        const ids = [...nodes.keys()].slice(0, 16),
-            pos = id => ({ x: 20 + (ids.indexOf(id) % 4) * 185, y: 20 + Math.floor(ids.indexOf(id) / 4) * 60 });
-        return html`<svg class="diagram" viewBox="0 0 760 260" role="img" aria-label="Схема компонентов">
-            <defs>
-                <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                    <path d="M0,0 L0,6 L8,3 z" fill="currentColor" />
-                </marker>
-            </defs>
-            ${edges.filter(([a, b]) => ids.includes(a) && ids.includes(b)).map(([a, b]) => svg`<line x1=${pos(a).x + 145} y1=${pos(a).y + 16} x2=${pos(b).x} y2=${pos(b).y + 16} stroke="currentColor" marker-end="url(#arrow)" />`)}${ids.map(id => svg`<rect x=${pos(id).x} y=${pos(id).y} width="145" height="32" rx="6" fill="var(--bg-app)" stroke="currentColor" /><text x=${pos(id).x + 7} y=${pos(id).y + 21} fill="currentColor" font-size="11">${nodes.get(id).slice(0, 22)}</text>`)}
-        </svg>`;
+        return html`<div class="diagram-controls">
+                <button
+                    aria-label="Уменьшить схему"
+                    ?disabled=${this.diagramZoom <= 0.5}
+                    @click=${() => (this.diagramZoom = Math.max(0.5, this.diagramZoom - 0.25))}
+                >
+                    −
+                </button>
+                <button aria-label="Сбросить масштаб схемы" @click=${() => (this.diagramZoom = 1)}>${Math.round(this.diagramZoom * 100)}%</button>
+                <button
+                    aria-label="Увеличить схему"
+                    ?disabled=${this.diagramZoom >= 2}
+                    @click=${() => (this.diagramZoom = Math.min(2, this.diagramZoom + 0.25))}
+                >
+                    +
+                </button>
+            </div>
+            <div class="diagram-scroll" tabindex="0" aria-label="Область схемы">
+                <svg
+                    class="diagram"
+                    style=${`width:${Math.ceil(graph.width * this.diagramZoom)}px;height:${Math.ceil(graph.height * this.diagramZoom)}px`}
+                    viewBox=${`0 0 ${graph.width} ${graph.height}`}
+                    role="img"
+                    aria-label="Схема компонентов"
+                >
+                    <defs>
+                        <marker id="design-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                            <path d="M0,0 L8,4 L0,8 Z" fill="#a5b4c5" />
+                        </marker>
+                    </defs>
+                    ${graph.edges.map(edge => svg`<path d=${edge.points.map((p, i) => `${i ? 'L' : 'M'}${p.x},${p.y}`).join(' ')} fill="none" stroke="#a5b4c5" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#design-arrow)" />`)}
+                    ${graph.edges.filter(edge => edge.label).map(edge => svg`<rect x=${edge.x - edge.width / 2} y=${edge.y - 12} width=${edge.width} height="24" fill="#191919" rx="4"/><text x=${edge.x} y=${edge.y + 5} text-anchor="middle" fill="#ddd" font-size="14">${edge.label}</text>`)}
+                    ${graph.nodes.map(n => svg`<g><title>${n.label}</title><rect x=${n.x - n.width / 2} y=${n.y - n.height / 2} width=${n.width} height=${n.height} rx="10" fill="#202832" stroke="#778a9e" /><text text-anchor="middle" fill="#f0f3f6" font-size="16">${n.lines.map((line, i) => svg`<tspan x=${n.x} y=${n.y - (n.lines.length - 1) * 11 + 5 + i * 22}>${line}</tspan>`)}</text></g>`)}
+                </svg>
+            </div>`;
+    }
+    renderDesign() {
+        return html`<div class="design-workspace">
+            <div class="design-header">
+                <h2>System Design</h2>
+                <div class="bar">
+                    <button ?disabled=${this.busy} @click=${() => this.perform(() => this.persist())}>Сохранить</button>
+                    <button
+                        ?disabled=${this.busy || !this.workspace.designVersions.length}
+                        @click=${() =>
+                            this.perform(async () => {
+                                const versions = [...this.workspace.designVersions];
+                                const previous = versions.pop();
+                                const next = { ...this.workspace, design: previous.design, designVersions: versions };
+                                await this.call('workspace-save', next);
+                                this.workspace = next;
+                            })}
+                    >
+                        Отменить изменение
+                    </button>
+                </div>
+            </div>
+            <div class="design-composer">
+                <textarea
+                    aria-label="Задание для System Design"
+                    placeholder="Задача или новое ограничение"
+                    .value=${this.constraint}
+                    ?disabled=${this.busy}
+                    @input=${e => (this.constraint = e.target.value)}
+                ></textarea>
+                <button class="primary" ?disabled=${this.busy || !this.constraint.trim()} @click=${this.updateDesign}>
+                    ${this.busy ? 'Обновление…' : 'Обновить с AI'}
+                </button>
+            </div>
+            ${
+                this.workspace.design.components
+                    ? html`<div class="design-card">
+                          ${this.diagram()}
+                          <details>
+                              <summary>Редактировать схему</summary>
+                              <textarea
+                                  aria-label="Код схемы"
+                                  .value=${this.workspace.design.components}
+                                  @input=${e => this.editDesign('components', e.target.value)}
+                              ></textarea>
+                          </details>
+                      </div>`
+                    : ''
+            }
+            <div class="grid design-fields">
+                ${[
+                    ['requirements', 'Требования'],
+                    ['load', 'Нагрузка'],
+                    ['api', 'API'],
+                    ['storage', 'Хранилища'],
+                    ['decisions', 'Принятые решения'],
+                ].map(
+                    ([key, label]) =>
+                        html`<div class="design-card">
+                            <label
+                                >${label}<textarea
+                                    .value=${this.workspace.design[key] || ''}
+                                    @input=${e => this.editDesign(key, e.target.value)}
+                                ></textarea>
+                            </label>
+                        </div>`
+                )}
+            </div>
+            ${
+                this.workspace.design.changes
+                    ? html`<details class="design-card" open>
+                          <summary>Последние изменения</summary>
+                          <div class="design-changes">${this.workspace.design.changes}</div>
+                      </details>`
+                    : ''
+            }
+        </div>`;
+    }
+    editDesign(key, value) {
+        this.workspace = { ...this.workspace, design: { ...this.workspace.design, [key]: value } };
     }
     renderPreparation() {
-        return html`<div class="bar">
+        return html`<div class="prep-content">
+            <h2>Preparation</h2>
+            <div class="bar">
                 <select
                     .value=${this.workspace.activePackageId}
                     @change=${e => {
@@ -496,7 +774,7 @@ export class InterviewTools extends LitElement {
                     }}
                 >
                     + Вакансия</button
-                ><button ?disabled=${this.busy} @click=${() => this.perform(() => this.persist())}>Сохранить выбор</button>
+                ><button ?disabled=${this.busy} @click=${() => this.perform(() => this.persist())}>Сохранить</button>
             </div>
             ${
                 this.prep
@@ -559,7 +837,8 @@ export class InterviewTools extends LitElement {
             <p class="muted">
                 Документы хранятся локально. При запросе выбранному AI отправляются подходящие фрагменты. Проверьте распознанный текст. Неуказанные
                 факты AI должен обозначать как отсутствующие.
-            </p>`;
+            </p>
+        </div>`;
     }
     render() {
         const selected = this.inbox.find(q => q.id === this.questionId);
@@ -837,60 +1116,7 @@ export class InterviewTools extends LitElement {
                                     <pre class="mono">${this.execution}</pre>`
                               : ''
                       }
-                      ${
-                          !this.preparationOnly && this.tab === 'design'
-                              ? html`${this.diagram()}
-                                    <div class="grid">
-                                        ${[
-                                            ['requirements', 'Требования'],
-                                            ['load', 'Нагрузка'],
-                                            ['api', 'API'],
-                                            ['storage', 'Хранилища'],
-                                            ['components', 'Схема: A[Название] --> B[Название]'],
-                                            ['decisions', 'Принятые решения'],
-                                        ].map(
-                                            ([key, label]) =>
-                                                html`<label
-                                                    >${label}<textarea
-                                                        .value=${this.workspace.design[key] || ''}
-                                                        @input=${e => {
-                                                            this.workspace = {
-                                                                ...this.workspace,
-                                                                design: { ...this.workspace.design, [key]: e.target.value },
-                                                            };
-                                                        }}
-                                                    ></textarea>
-                                                </label>`
-                                        )}
-                                    </div>
-                                    <label
-                                        >Новое задание или ограничение<textarea
-                                            .value=${this.constraint}
-                                            @input=${e => (this.constraint = e.target.value)}
-                                        ></textarea>
-                                    </label>
-                                    <div class="bar">
-                                        <button ?disabled=${this.busy || !this.constraint.trim()} @click=${this.updateDesign}>
-                                            Обновить проект с AI</button
-                                        ><button ?disabled=${this.busy} @click=${() => this.perform(() => this.persist())}>Сохранить вручную</button
-                                        ><button
-                                            ?disabled=${this.busy || !this.workspace.designVersions.length}
-                                            @click=${() =>
-                                                this.perform(async () => {
-                                                    const versions = [...this.workspace.designVersions];
-                                                    const previous = versions.pop();
-                                                    const next = { ...this.workspace, design: previous.design, designVersions: versions };
-                                                    await this.call('workspace-save', next);
-                                                    this.workspace = next;
-                                                    this.status = 'Версия восстановлена';
-                                                })}
-                                        >
-                                            Откатить версию
-                                        </button>
-                                    </div>
-                                    <pre class="mono">${this.workspace.design.changes || ''}</pre>`
-                              : ''
-                      }
+                      ${!this.preparationOnly && this.tab === 'design' ? this.renderDesign() : ''}
                   </div>`
                 : ''
         }${this.status ? html`<div role="status" style="padding:4px 10px;font-size:14px">${this.status}</div>` : ''}`;
