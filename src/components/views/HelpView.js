@@ -123,6 +123,7 @@ export class HelpView extends LitElement {
             decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
             decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
             increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
+            toggleTeleprompter: isMac ? 'Cmd+Alt+S' : 'Ctrl+Alt+S',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
         };
@@ -143,6 +144,7 @@ export class HelpView extends LitElement {
             ['Уменьшить шрифт', this.keybinds.decreaseFont],
             ['Прозрачнее окно', this.keybinds.decreaseOpacity],
             ['Плотнее окно', this.keybinds.increaseOpacity],
+            ['Суфлёр (автопрокрутка)', this.keybinds.toggleTeleprompter],
             ['Move Window Up', this.keybinds.moveUp],
             ['Move Window Down', this.keybinds.moveDown],
             ['Move Window Left', this.keybinds.moveLeft],

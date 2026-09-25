@@ -315,6 +315,7 @@ export class CustomizeView extends LitElement {
             decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
             decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
             increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
+            toggleTeleprompter: isMac ? 'Cmd+Alt+S' : 'Ctrl+Alt+S',
         };
     }
 
@@ -335,6 +336,7 @@ export class CustomizeView extends LitElement {
             { key: 'decreaseFont', name: 'Уменьшить шрифт ответа', description: 'Уменьшить шрифт во время сессии' },
             { key: 'decreaseOpacity', name: 'Прозрачнее окно', description: 'Сделать окно прозрачнее, чтобы видеть экран под ним' },
             { key: 'increaseOpacity', name: 'Плотнее окно', description: 'Сделать окно менее прозрачным' },
+            { key: 'toggleTeleprompter', name: 'Суфлёр', description: 'Включить или выключить автопрокрутку ответа' },
             { key: 'scrollDown', name: 'Scroll Response Down', description: 'Scroll response content downward' },
         ];
     }

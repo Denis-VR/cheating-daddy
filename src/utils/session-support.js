@@ -272,6 +272,20 @@ function installSessionSupport(ipcMain, isActive) {
             return reviewSession(session);
         })
     );
+    let debriefing = false;
+    ipcMain.handle(
+        'session:ai-debrief',
+        guarded(async value => {
+            if (!value || typeof value.id !== 'string') throw new Error('Некорректная сессия');
+            if (debriefing) throw new Error('Разбор уже готовится');
+            debriefing = true;
+            try {
+                return await require('./debrief').generateDebrief(value.id, { force: value.force === true });
+            } finally {
+                debriefing = false;
+            }
+        })
+    );
     let probing = false;
     ipcMain.handle(
         'session:preflight',

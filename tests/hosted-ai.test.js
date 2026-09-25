@@ -286,3 +286,16 @@ test('optional model IDs are validated and vision defaults to response model', (
         assert.throws(() => session({ [field]: 'missing-provider' }), /Invalid .* model ID/);
     }
 });
+test('each transcribed utterance is published to the live transcript with its channel', async () => {
+    const events = [];
+    const s = session({
+        reviewAudio: true,
+        emit: (name, data) => name === 'transcript-line' && events.push(data),
+        fetchImpl: async () => ({ ok: true, json: async () => ({ text: 'Расскажите про индексы' }) }),
+    });
+    assert.equal((await s.enqueue({ pcm: tone(25), channel: 'mic' })).success, true);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].text, 'Расскажите про индексы');
+    assert.equal(events[0].channel, 'mic');
+    assert.equal(typeof events[0].at, 'number');
+});

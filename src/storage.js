@@ -477,6 +477,8 @@ function saveSession(sessionId, data) {
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
         screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
+        // AI debrief generated after the interview
+        debrief: data.debrief || existingSession?.debrief || null,
     };
     return writeJsonFile(sessionPath, sessionData);
 }

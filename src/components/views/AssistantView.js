@@ -18,6 +18,12 @@ const DEFAULT_QUICK_ACTIONS = [
     },
 ];
 
+const TELEPROMPTER_SPEED = { min: 10, max: 200, step: 10 };
+
+function clampSpeed(value) {
+    return Math.max(TELEPROMPTER_SPEED.min, Math.min(TELEPROMPTER_SPEED.max, Math.round(value)));
+}
+
 async function copyText(text) {
     try {
         window.require('electron').clipboard.writeText(text);
@@ -33,7 +39,8 @@ export class AssistantView extends LitElement {
         interview-tools[design-active] ~ .input-bar,
         interview-tools[design-active] ~ .quick-followups,
         interview-tools[design-active] ~ .action-editor,
-        interview-tools[design-active] ~ .attachments {
+        interview-tools[design-active] ~ .attachments,
+        interview-tools[design-active] ~ .transcript {
             display: none !important;
         }
 
@@ -289,6 +296,100 @@ export class AssistantView extends LitElement {
             border-color: var(--success);
         }
 
+        /* ── Live transcript ── */
+
+        .transcript {
+            position: relative;
+            flex-shrink: 0;
+            padding: 6px 36px 6px var(--space-md);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-surface);
+            font-size: 13px;
+            line-height: 1.45;
+            color: var(--text-muted);
+            user-select: text;
+        }
+
+        .transcript-line {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .transcript-line.latest {
+            color: var(--text-secondary);
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .transcript-line .who {
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-secondary);
+            margin-right: 4px;
+        }
+
+        .transcript-line .who.me {
+            color: var(--accent);
+        }
+
+        .transcript-hide {
+            position: absolute;
+            top: 4px;
+            right: 8px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 16px;
+            line-height: 1;
+            padding: 2px 4px;
+            cursor: pointer;
+        }
+
+        .transcript-hide:hover {
+            color: var(--text-primary);
+        }
+
+        /* ── Teleprompter ── */
+
+        .tp-controls {
+            position: absolute;
+            left: var(--space-md);
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .nav-text-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: var(--font-size-xs);
+            font-family: var(--font);
+            cursor: pointer;
+            padding: var(--space-xs) 6px;
+            border-radius: var(--radius-sm);
+            transition: color var(--transition);
+        }
+
+        .nav-text-btn:hover,
+        .nav-text-btn.on {
+            color: var(--text-primary);
+        }
+
+        .nav-text-btn.on {
+            background: rgba(59, 130, 246, 0.16);
+        }
+
+        .tp-speed {
+            font-size: var(--font-size-xs);
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            min-width: 22px;
+            text-align: center;
+        }
+
         /* ── Response navigation strip ── */
 
         .response-nav {
@@ -515,6 +616,10 @@ export class AssistantView extends LitElement {
         shouldAnimateResponse: { type: Boolean },
         isAnalyzing: { type: Boolean, state: true },
         answerCopied: { state: true },
+        transcript: { type: Array },
+        showTranscript: { state: true },
+        teleprompterOn: { state: true },
+        teleprompterSpeed: { state: true },
     };
 
     constructor() {
@@ -528,6 +633,10 @@ export class AssistantView extends LitElement {
         this.onSendText = () => {};
         this.isAnalyzing = false;
         this._animFrame = null;
+        this.transcript = [];
+        this.showTranscript = true;
+        this.teleprompterOn = false;
+        this.teleprompterSpeed = 30;
     }
 
     getProfileNames() {
@@ -705,6 +814,8 @@ export class AssistantView extends LitElement {
             .then(prefs => {
                 if (Array.isArray(prefs.quickActions))
                     this.quickActions = prefs.quickActions.filter(a => a && typeof a.label === 'string' && typeof a.prompt === 'string').slice(0, 12);
+                if (prefs.showTranscript === false) this.showTranscript = false;
+                if (Number.isFinite(prefs.teleprompterSpeed)) this.teleprompterSpeed = clampSpeed(prefs.teleprompterSpeed);
             })
             .catch(console.error);
 
@@ -722,6 +833,8 @@ export class AssistantView extends LitElement {
                 this.changeFontSize(step);
             };
             ipcRenderer.on('response-font-step', this.handleFontStep);
+            this.handleTeleprompterToggle = () => this.toggleTeleprompter();
+            ipcRenderer.on('toggle-teleprompter', this.handleTeleprompterToggle);
 
             ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
             ipcRenderer.on('navigate-next-response', this.handleNextResponse);
@@ -733,6 +846,7 @@ export class AssistantView extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopWaveformAnimation();
+        this.stopTeleprompter();
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -741,6 +855,7 @@ export class AssistantView extends LitElement {
             if (this.handleScrollUp) ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
             if (this.handleScrollDown) ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
             if (this.handleFontStep) ipcRenderer.removeListener('response-font-step', this.handleFontStep);
+            if (this.handleTeleprompterToggle) ipcRenderer.removeListener('toggle-teleprompter', this.handleTeleprompterToggle);
         }
     }
 
@@ -1106,6 +1221,64 @@ export class AssistantView extends LitElement {
         }, 1500);
     }
 
+    toggleTeleprompter() {
+        if (this.teleprompterOn) this.stopTeleprompter();
+        else this.startTeleprompter();
+    }
+
+    startTeleprompter() {
+        const container = this.shadowRoot?.querySelector('#responseContainer');
+        if (!container || this.teleprompterOn) return;
+        this.teleprompterOn = true;
+        container.style.scrollBehavior = 'auto';
+        let position = container.scrollTop;
+        let last = performance.now();
+        const step = now => {
+            if (!this.teleprompterOn) return;
+            const elapsed = Math.min(0.1, (now - last) / 1000);
+            last = now;
+            // Manual scrolling or a new answer moves the reading position; continue from there.
+            if (Math.abs(container.scrollTop - position) > 2) position = container.scrollTop;
+            position = Math.min(container.scrollHeight - container.clientHeight, position + this.teleprompterSpeed * elapsed);
+            container.scrollTop = position;
+            this._teleprompterFrame = requestAnimationFrame(step);
+        };
+        this._teleprompterFrame = requestAnimationFrame(step);
+    }
+
+    stopTeleprompter() {
+        this.teleprompterOn = false;
+        cancelAnimationFrame(this._teleprompterFrame);
+        const container = this.shadowRoot?.querySelector('#responseContainer');
+        if (container) container.style.scrollBehavior = '';
+    }
+
+    changeTeleprompterSpeed(direction) {
+        this.teleprompterSpeed = clampSpeed(this.teleprompterSpeed + direction * TELEPROMPTER_SPEED.step);
+        window.cheatingDaddy.storage.updatePreference('teleprompterSpeed', this.teleprompterSpeed).catch(console.error);
+    }
+
+    setShowTranscript(visible) {
+        this.showTranscript = visible;
+        window.cheatingDaddy.storage.updatePreference('showTranscript', visible).catch(console.error);
+    }
+
+    renderTranscript() {
+        if (!this.showTranscript || !this.transcript?.length) return '';
+        const last = this.transcript.length - 1;
+        return html`<div class="transcript" role="log" aria-live="polite" aria-label="Распознанная речь">
+            ${this.transcript.map(
+                (line, i) =>
+                    html`<div class="transcript-line ${i === last ? 'latest' : ''}">
+                        <span class="who ${line.channel === 'mic' ? 'me' : ''}">${line.channel === 'mic' ? 'Вы:' : 'Интервьюер:'}</span>${line.text}
+                    </div>`
+            )}
+            <button class="transcript-hide" title="Скрыть ленту речи" aria-label="Скрыть ленту речи" @click=${() => this.setShowTranscript(false)}>
+                ×
+            </button>
+        </div>`;
+    }
+
     async copyCurrentAnswer() {
         const text = this.getCurrentResponse()
             .replace(/^#{1,6}\s+Сказать сейчас\s*$/gm, '')
@@ -1175,12 +1348,31 @@ export class AssistantView extends LitElement {
                       ></interview-tools>`
                     : ''
             }
+            ${this.renderTranscript()}
             <div class="response-container" id="responseContainer" @click=${this.handleResponseClick}></div>
 
             ${
                 visible.length > 0
                     ? html`
                           <div class="response-nav">
+                              <div class="tp-controls">
+                                  <button
+                                      class="nav-text-btn ${this.teleprompterOn ? 'on' : ''}"
+                                      aria-pressed=${this.teleprompterOn}
+                                      title="Автопрокрутка ответа (Cmd/Ctrl+Alt+S)"
+                                      @click=${this.toggleTeleprompter}
+                                  >
+                                      ${this.teleprompterOn ? '❚❚ Суфлёр' : '▶ Суфлёр'}
+                                  </button>
+                                  <button class="nav-text-btn" title="Медленнее" aria-label="Медленнее" @click=${() => this.changeTeleprompterSpeed(-1)}>−</button>
+                                  <span class="tp-speed" title="Скорость, пикселей в секунду">${this.teleprompterSpeed}</span>
+                                  <button class="nav-text-btn" title="Быстрее" aria-label="Быстрее" @click=${() => this.changeTeleprompterSpeed(1)}>+</button>
+                                  ${
+                                      !this.showTranscript && this.transcript?.length
+                                          ? html`<button class="nav-text-btn" title="Показать ленту речи" @click=${() => this.setShowTranscript(true)}>Речь</button>`
+                                          : ''
+                                  }
+                              </div>
                               ${
                                   hasMultipleResponses
                                       ? html`<button class="nav-btn" @click=${this.navigateToPreviousResponse} ?disabled=${position <= 0} title="Previous response">

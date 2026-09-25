@@ -128,6 +128,7 @@ function getDefaultKeybinds() {
         decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
         decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
         increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
+        toggleTeleprompter: isMac ? 'Cmd+Alt+S' : 'Ctrl+Alt+S',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
@@ -139,6 +140,13 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     globalShortcut.unregisterAll();
     if (keybinds.focusMode) globalShortcut.register(keybinds.focusMode, () => sendToRenderer('toggle-focus-mode'));
     globalShortcut.register('CommandOrControl+P', () => sendToRenderer('toggle-session-pause'));
+    if (keybinds.toggleTeleprompter) {
+        try {
+            globalShortcut.register(keybinds.toggleTeleprompter, () => sendToRenderer('toggle-teleprompter'));
+        } catch (error) {
+            console.error('Teleprompter shortcut unavailable:', error.message);
+        }
+    }
 
     for (const [action, step] of [
         ['increaseFont', 2],

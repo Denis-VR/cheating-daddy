@@ -470,6 +470,7 @@ export class CheatingDaddyApp extends LitElement {
     static properties = {
         focusMode: { state: true },
         _opacityHint: { state: true },
+        transcriptLines: { state: true },
         recovery: { state: true },
         lastReview: { state: true },
         _preflightBusy: { state: true },
@@ -516,6 +517,7 @@ export class CheatingDaddyApp extends LitElement {
         this.layoutMode = 'normal';
         this.responses = [];
         this.topicMeta = [];
+        this.transcriptLines = [];
         this._responseIds = new Map();
         this._inlineRequests = new Map();
         this._manualRequestRevision = 0;
@@ -599,6 +601,10 @@ export class CheatingDaddyApp extends LitElement {
                 clearTimeout(this._opacityHintTimer);
                 this._opacityHintTimer = setTimeout(() => (this._opacityHint = null), 1500);
             });
+            ipcRenderer.on('transcript-line', (_, line) => {
+                if (!line || typeof line.text !== 'string' || !line.text.trim()) return;
+                this.transcriptLines = [...this.transcriptLines.slice(-2), { text: line.text.trim().slice(0, 600), channel: line.channel, at: line.at }];
+            });
             ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
             ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));
             ipcRenderer.on('update-status', (_, status) => this.setStatus(status));
@@ -625,6 +631,7 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('toggle-focus-mode');
             ipcRenderer.removeAllListeners('toggle-session-pause');
             ipcRenderer.removeAllListeners('window-opacity-changed');
+            ipcRenderer.removeAllListeners('transcript-line');
             ipcRenderer.removeAllListeners('new-response');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
@@ -1082,6 +1089,7 @@ export class CheatingDaddyApp extends LitElement {
         this._baseResponses.clear();
         this.responses = [];
         this.topicMeta = [];
+        this.transcriptLines = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.sessionActive = true;
@@ -1258,6 +1266,7 @@ export class CheatingDaddyApp extends LitElement {
                         .hostedMode=${this.hostedMode}
                         .manualRequestRevision=${this._manualRequestRevision}
                         .responses=${this.responses}
+                        .transcript=${this.transcriptLines}
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
                         .onSendText=${msg => this.handleSendText(msg)}
