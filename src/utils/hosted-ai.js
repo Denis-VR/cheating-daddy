@@ -329,6 +329,7 @@ class HostedSession {
                             job.resolve({ success: true });
                             continue;
                         }
+                        if (!this.paused && !this.closed) this.emit('transcript-line', { text, channel: job.channel || 'system', at: Date.now() });
                     }
                     if (this.closed) throw new Error('Session closed');
                     if (job.pcm && this.reviewAudio) {

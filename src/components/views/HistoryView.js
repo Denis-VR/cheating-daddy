@@ -17,6 +17,41 @@ export class HistoryView extends LitElement {
             .unified-page {
                 overflow-y: hidden;
             }
+            .debrief-card {
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                background: var(--bg-surface);
+                padding: 14px 16px;
+                margin-bottom: 18px;
+            }
+            .debrief-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+            .debrief-head h3 {
+                margin: 0;
+            }
+            .debrief-head small {
+                color: var(--text-muted);
+            }
+            .debrief-body {
+                line-height: 1.6;
+                user-select: text;
+            }
+            .debrief-body h2 {
+                font-size: 15px;
+                margin: 16px 0 6px;
+            }
+            .debrief-body ul,
+            .debrief-body ol {
+                padding-left: 20px;
+            }
+            .debrief-error {
+                color: var(--danger);
+            }
 
             .unified-wrap {
                 height: 100%;
@@ -272,6 +307,9 @@ export class HistoryView extends LitElement {
         selectedSession: { type: Object },
         initialReviewId: { type: String },
         review: { state: true },
+        debrief: { state: true },
+        debriefBusy: { state: true },
+        debriefError: { state: true },
         selectedSessionId: { type: String },
         loading: { type: Boolean },
         activeTab: { type: String },
@@ -292,8 +330,13 @@ export class HistoryView extends LitElement {
     updated(changed) {
         if (changed.has('initialReviewId') && this.initialReviewId) {
             const id = this.initialReviewId;
+            const owner = window.cheatingDaddy?.element?.();
+            const autoDebrief = owner?._autoDebrief;
+            if (owner) owner._autoDebrief = false;
             this.openSession(id).then(() => {
-                if (this.selectedSessionId === id) this.activeTab = 'review';
+                if (this.selectedSessionId !== id) return;
+                this.activeTab = 'review';
+                if (autoDebrief && !this.debrief) this.requestDebrief();
             });
         }
     }
@@ -316,6 +359,8 @@ export class HistoryView extends LitElement {
             if (session) {
                 this.selectedSession = session;
                 this.selectedSessionId = sessionId;
+                this.debrief = session.debrief || null;
+                this.debriefError = '';
                 const result = await window.require('electron').ipcRenderer.invoke('session:review', sessionId);
                 if (this.selectedSessionId !== sessionId) return;
                 this.review = result.success ? result.data : null;
@@ -325,6 +370,50 @@ export class HistoryView extends LitElement {
         } catch (error) {
             console.error('Error loading session:', error);
         }
+    }
+
+    async requestDebrief(force = false) {
+        if (this.debriefBusy || !this.selectedSessionId) return;
+        const id = this.selectedSessionId;
+        this.debriefBusy = true;
+        this.debriefError = '';
+        try {
+            const result = await window.require('electron').ipcRenderer.invoke('session:ai-debrief', { id, force });
+            if (this.selectedSessionId !== id) return;
+            if (!result.success) throw new Error(result.error);
+            this.debrief = result.data;
+        } catch (error) {
+            this.debriefError = error.message;
+        } finally {
+            this.debriefBusy = false;
+        }
+    }
+
+    renderDebriefMarkdown(text) {
+        try {
+            const rendered = window.marked ? window.marked.parse(text) : text;
+            return window.require('dompurify')(window).sanitize(rendered, { USE_PROFILES: { html: true }, FORBID_TAGS: ['img', 'style', 'form', 'input', 'button'] });
+        } catch (_) {
+            return '';
+        }
+    }
+
+    renderDebrief() {
+        return html`<div class="debrief-card">
+            <div class="debrief-head">
+                <h3>ИИ-итоги собеса</h3>
+                <button class="tab-btn" ?disabled=${this.debriefBusy} @click=${() => this.requestDebrief(!!this.debrief)}>
+                    ${this.debriefBusy ? 'Готовлю разбор…' : this.debrief ? 'Обновить' : 'Сделать разбор'}
+                </button>
+            </div>
+            ${
+                this.debrief
+                    ? html`<small>${new Date(this.debrief.createdAt).toLocaleString()} · ${this.debrief.model}</small>
+                          <div class="debrief-body" .innerHTML=${this.renderDebriefMarkdown(this.debrief.text)}></div>`
+                    : html`<p>Модель соберёт вопросы интервьюера, отметит трудные темы и составит план, что подтянуть. Запрос оплачивается через API провайдера.</p>`
+            }
+            ${this.debriefError ? html`<p class="debrief-error" role="alert">${this.debriefError}</p>` : ''}
+        </div>`;
     }
 
     async deleteHistory(id = null) {
@@ -426,7 +515,8 @@ export class HistoryView extends LitElement {
         if (!this.selectedSession) return html`<div class="empty">Select a session.</div>`;
 
         if (this.activeTab === 'review')
-            return html`<p>${this.review?.note || 'Разбор недоступен'}</p>
+            return html`${this.renderDebrief()}
+                <p>${this.review?.note || 'Разбор недоступен'}</p>
                 ${[
                     ['difficult', 'Что стоит повторить'],
                     ['verify', 'Какие ответы перепроверить'],
@@ -585,7 +675,7 @@ export class HistoryView extends LitElement {
             </div>
             <div class="tab-row">
                 <button
-                    class="tab-btn"
+                    class="tab-btn ${this.activeTab === 'review' ? 'active' : ''}"
                     @click=${() => {
                         this.activeTab = 'review';
                     }}

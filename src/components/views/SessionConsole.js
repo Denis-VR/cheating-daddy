@@ -170,14 +170,24 @@ export class SessionConsole extends LitElement {
                           <ul>
                               ${this.review.tomorrow.map(r => html`<li>${r.task}</li>`)}
                           </ul>
-                          <button
-                              @click=${() => {
-                                  this.owner._reviewToOpen = this.owner._lastFinishedSessionId;
-                                  this.owner.navigate('history');
-                              }}
-                          >
-                              Открыть полный разбор в History
-                          </button>
+                          <div class="actions">
+                              <button
+                                  @click=${() => {
+                                      this.owner._reviewToOpen = this.owner._lastFinishedSessionId;
+                                      this.owner._autoDebrief = true;
+                                      this.owner.navigate('history');
+                                  }}
+                              >
+                                  ИИ-итоги собеса</button
+                              ><button
+                                  @click=${() => {
+                                      this.owner._reviewToOpen = this.owner._lastFinishedSessionId;
+                                      this.owner.navigate('history');
+                                  }}
+                              >
+                                  Открыть полный разбор в History
+                              </button>
+                          </div>
                       </details>`
                     : ''
             }

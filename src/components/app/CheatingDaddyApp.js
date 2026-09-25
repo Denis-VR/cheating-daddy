@@ -307,7 +307,8 @@ export class CheatingDaddyApp extends LitElement {
         .live-bar-right {
             display: flex;
             align-items: center;
-            gap: var(--space-md);
+            gap: var(--space-sm);
+            min-width: 0;
             -webkit-app-region: no-drag;
             z-index: 1;
         }
@@ -326,6 +327,92 @@ export class CheatingDaddyApp extends LitElement {
 
         .live-bar-text.clickable:hover {
             color: var(--text-primary);
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: var(--space-xs);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+            animation: live-pulse 1.8s ease-out infinite;
+        }
+
+        .live-dot.paused {
+            background: var(--warning);
+            animation: none;
+        }
+
+        @keyframes live-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .live-bar-text.profile {
+            font-family: var(--font);
+        }
+
+        .live-bar-right .live-bar-text.status {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .live-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            height: 22px;
+            padding: 0 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border-strong);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            font-size: var(--font-size-xs);
+            font-family: var(--font);
+            white-space: nowrap;
+            cursor: pointer;
+            transition:
+                color var(--transition),
+                border-color var(--transition),
+                background var(--transition);
+        }
+
+        .live-chip:hover:not(:disabled) {
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+        }
+
+        .live-chip:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+
+        .live-chip.accent {
+            color: var(--text-primary);
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.16);
+        }
+
+        .live-chip.warning {
+            color: var(--warning);
+            border-color: rgba(212, 160, 23, 0.5);
+            background: rgba(212, 160, 23, 0.1);
+            cursor: default;
         }
 
         /* Content inner */
@@ -382,6 +469,8 @@ export class CheatingDaddyApp extends LitElement {
 
     static properties = {
         focusMode: { state: true },
+        _opacityHint: { state: true },
+        transcriptLines: { state: true },
         recovery: { state: true },
         lastReview: { state: true },
         _preflightBusy: { state: true },
@@ -428,6 +517,7 @@ export class CheatingDaddyApp extends LitElement {
         this.layoutMode = 'normal';
         this.responses = [];
         this.topicMeta = [];
+        this.transcriptLines = [];
         this._responseIds = new Map();
         this._inlineRequests = new Map();
         this._manualRequestRevision = 0;
@@ -506,6 +596,15 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('toggle-session-pause', () => {
                 if (this.sessionActive) this.togglePause();
             });
+            ipcRenderer.on('window-opacity-changed', (_, opacity) => {
+                this._opacityHint = Math.round(opacity * 100);
+                clearTimeout(this._opacityHintTimer);
+                this._opacityHintTimer = setTimeout(() => (this._opacityHint = null), 1500);
+            });
+            ipcRenderer.on('transcript-line', (_, line) => {
+                if (!line || typeof line.text !== 'string' || !line.text.trim()) return;
+                this.transcriptLines = [...this.transcriptLines.slice(-2), { text: line.text.trim().slice(0, 600), channel: line.channel, at: line.at }];
+            });
             ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
             ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));
             ipcRenderer.on('update-status', (_, status) => this.setStatus(status));
@@ -531,6 +630,8 @@ export class CheatingDaddyApp extends LitElement {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeAllListeners('toggle-focus-mode');
             ipcRenderer.removeAllListeners('toggle-session-pause');
+            ipcRenderer.removeAllListeners('window-opacity-changed');
+            ipcRenderer.removeAllListeners('transcript-line');
             ipcRenderer.removeAllListeners('new-response');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
@@ -988,6 +1089,7 @@ export class CheatingDaddyApp extends LitElement {
         this._baseResponses.clear();
         this.responses = [];
         this.topicMeta = [];
+        this.transcriptLines = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.sessionActive = true;
@@ -1164,6 +1266,7 @@ export class CheatingDaddyApp extends LitElement {
                         .hostedMode=${this.hostedMode}
                         .manualRequestRevision=${this._manualRequestRevision}
                         .responses=${this.responses}
+                        .transcript=${this.transcriptLines}
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
                         .onSendText=${msg => this.handleSendText(msg)}
@@ -1282,18 +1385,24 @@ export class CheatingDaddyApp extends LitElement {
         if (!this._isLiveMode()) return '';
 
         const profileLabels = {
-            interview: 'Interview',
-            sales: 'Sales Call',
-            meeting: 'Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam',
+            interview: 'Собеседование',
+            sales: 'Продажи',
+            meeting: 'Встреча',
+            presentation: 'Презентация',
+            negotiation: 'Переговоры',
+            exam: 'Экзамен',
+        };
+        const waiting = this.responses.filter((_, i) => i > this.currentResponseIndex && !this.topicMeta[i]?.hidden).length;
+        const showNext = () => {
+            let next = this.currentResponseIndex + 1;
+            while (next < this.responses.length && this.topicMeta[next]?.hidden) next++;
+            if (next < this.responses.length) this.currentResponseIndex = next;
         };
 
         return html`
             <div class="live-bar">
                 <div class="live-bar-left">
-                    <button class="live-bar-back" @click=${() => this.handleClose()} title="End session">
+                    <button class="live-bar-back" @click=${() => this.handleClose()} title="Завершить сессию">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path
                                 fill-rule="evenodd"
@@ -1302,37 +1411,33 @@ export class CheatingDaddyApp extends LitElement {
                             />
                         </svg>
                     </button>
+                    <div class="live-indicator" title=${this._isPaused ? 'Аудио на паузе' : 'Идёт запись'}>
+                        <span class="live-dot ${this._isPaused ? 'paused' : ''}"></span>
+                        <span class="live-bar-text">${this.getElapsedTime()}</span>
+                        <span class="live-bar-text profile">· ${profileLabels[this.selectedProfile] || 'Сессия'}</span>
+                    </div>
                 </div>
-                <div class="live-bar-center">${profileLabels[this.selectedProfile] || 'Session'}</div>
                 <div class="live-bar-right">
-                    ${this.statusText ? html`<span class="live-bar-text">${this.statusText}</span>` : ''}
-                    <span class="live-bar-text">${this.getElapsedTime()}</span>
-                    <button
-                        class="live-bar-text clickable"
-                        ?disabled=${this._pausePending}
-                        aria-pressed=${this._isPaused}
-                        title="Pause audio (Cmd/Ctrl+P). Text and Analyze Screen remain available."
-                        @click=${() => this.togglePause()}
-                    >
-                        ${this._isPaused ? '[resume]' : '[pause]'}
-                    </button>
+                    ${this.statusText ? html`<span class="live-bar-text status" title=${this.statusText}>${this.statusText}</span>` : ''}
+                    ${this._opacityHint ? html`<span class="live-bar-text">Видимость ${this._opacityHint}%</span>` : ''}
                     ${
-                        this.responses.filter((_, i) => i > this.currentResponseIndex && !this.topicMeta[i]?.hidden).length > 0
-                            ? html` <button
-                                  class="live-bar-text clickable"
-                                  @click=${() => {
-                                      let next = this.currentResponseIndex + 1;
-                                      while (next < this.responses.length && this.topicMeta[next]?.hidden) next++;
-                                      if (next < this.responses.length) this.currentResponseIndex = next;
-                                  }}
-                              >
-                                  [next · ${this.responses.filter((_, i) => i > this.currentResponseIndex && !this.topicMeta[i]?.hidden).length}
-                                  waiting]
+                        waiting > 0
+                            ? html`<button class="live-chip accent" title="Следующий ответ (Cmd/Ctrl+])" @click=${showNext}>
+                                  Ждут ответы · ${waiting}
                               </button>`
                             : ''
                     }
-                    ${this._isClickThrough ? html`<span class="live-bar-text">[click through]</span>` : ''}
-                    <span class="live-bar-text clickable" @click=${() => this.handleHideToggle()}>[hide]</span>
+                    ${this._isClickThrough ? html`<span class="live-chip warning" title="Клики проходят сквозь окно">Сквозные клики</span>` : ''}
+                    <button
+                        class="live-chip"
+                        ?disabled=${this._pausePending}
+                        aria-pressed=${this._isPaused}
+                        title="Пауза аудио (Cmd/Ctrl+P). Текст и снимок экрана остаются доступны."
+                        @click=${() => this.togglePause()}
+                    >
+                        ${this._isPaused ? 'Продолжить' : 'Пауза'}
+                    </button>
+                    <button class="live-chip" title="Скрыть окно" @click=${() => this.handleHideToggle()}>Скрыть</button>
                 </div>
             </div>
         `;
