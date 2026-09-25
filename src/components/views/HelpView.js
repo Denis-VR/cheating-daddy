@@ -121,6 +121,8 @@ export class HelpView extends LitElement {
             focusMode: isMac ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
             increaseFont: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
             decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
+            decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
+            increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
         };
@@ -139,6 +141,8 @@ export class HelpView extends LitElement {
             ['Только ответ / настройки', this.keybinds.focusMode],
             ['Увеличить шрифт', this.keybinds.increaseFont],
             ['Уменьшить шрифт', this.keybinds.decreaseFont],
+            ['Прозрачнее окно', this.keybinds.decreaseOpacity],
+            ['Плотнее окно', this.keybinds.increaseOpacity],
             ['Move Window Up', this.keybinds.moveUp],
             ['Move Window Down', this.keybinds.moveDown],
             ['Move Window Left', this.keybinds.moveLeft],

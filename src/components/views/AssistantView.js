@@ -2,7 +2,29 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
 import { InterviewTools } from './InterviewTools.js';
 
-const DEFAULT_QUICK_ACTIONS = ['Короче', 'Пример на Go', 'Почему?', 'Сравнить'].map(label => ({ label, prompt: label }));
+const DEFAULT_QUICK_ACTIONS = [
+    ...['Короче', 'Пример на Go', 'Почему?', 'Сравнить'].map(label => ({ label, prompt: label })),
+    {
+        label: 'STAR-история',
+        prompt: 'Перескажи ответ как историю по STAR (ситуация, задача, действия, результат) от первого лица, опираясь на мой опыт из резюме. 4–6 предложений, готово для произнесения вслух.',
+    },
+    {
+        label: 'Сложность O()',
+        prompt: 'Оцени временную и пространственную сложность решения в нотации O() и кратко объясни, откуда она берётся. Если есть более оптимальный вариант, назови его.',
+    },
+    {
+        label: 'Вопросы интервьюеру',
+        prompt: 'Предложи 3 коротких уточняющих вопроса к интервьюеру по этой теме, которые помогут выиграть время и покажут глубину понимания.',
+    },
+];
+
+async function copyText(text) {
+    try {
+        window.require('electron').clipboard.writeText(text);
+    } catch (_) {
+        await navigator.clipboard.writeText(text);
+    }
+}
 
 export class AssistantView extends LitElement {
     static styles = css`
@@ -229,9 +251,49 @@ export class AssistantView extends LitElement {
             background: #444444;
         }
 
+        .response-container pre {
+            position: relative;
+        }
+
+        .response-container .copy-code {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            font-family: var(--font);
+            font-size: 12px;
+            line-height: 1;
+            padding: 5px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-strong);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            cursor: pointer;
+            opacity: 0.55;
+            user-select: none;
+            transition:
+                opacity var(--transition),
+                color var(--transition);
+        }
+
+        .response-container pre:hover .copy-code,
+        .response-container .copy-code.copied {
+            opacity: 1;
+        }
+
+        .response-container .copy-code:hover {
+            color: var(--text-primary);
+        }
+
+        .response-container .copy-code.copied {
+            color: var(--success);
+            border-color: var(--success);
+        }
+
         /* ── Response navigation strip ── */
 
         .response-nav {
+            position: relative;
+            min-height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -266,6 +328,24 @@ export class AssistantView extends LitElement {
         .nav-btn svg {
             width: 14px;
             height: 14px;
+        }
+
+        .copy-answer {
+            position: absolute;
+            right: var(--space-md);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: var(--font-size-xs);
+            font-family: var(--font);
+            cursor: pointer;
+            padding: var(--space-xs);
+            transition: color var(--transition);
+        }
+
+        .copy-answer:hover,
+        .copy-answer.copied {
+            color: var(--text-primary);
         }
 
         .response-counter {
@@ -434,6 +514,7 @@ export class AssistantView extends LitElement {
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
         isAnalyzing: { type: Boolean, state: true },
+        answerCopied: { state: true },
     };
 
     constructor() {
@@ -986,6 +1067,7 @@ export class AssistantView extends LitElement {
             const renderedResponse = this.renderMarkdown(currentResponse);
             const expanded = changedAnswer ? [] : [...container.querySelectorAll('details')].map(d => d.open);
             container.innerHTML = renderedResponse;
+            if (this.responses.length) this.addCopyButtons(container);
             container.querySelectorAll('details').forEach((d, i) => {
                 d.open = expanded[i] || false;
             });
@@ -993,6 +1075,50 @@ export class AssistantView extends LitElement {
             if (this.shouldAnimateResponse) {
                 this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
             }
+        }
+    }
+
+    addCopyButtons(container) {
+        for (const pre of container.querySelectorAll('pre')) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'copy-code';
+            button.textContent = 'Копировать';
+            button.setAttribute('aria-label', 'Копировать код');
+            pre.appendChild(button);
+        }
+    }
+
+    async handleResponseClick(event) {
+        const button = event.target.closest?.('.copy-code');
+        if (!button) return;
+        const text = button.parentElement.querySelector('code')?.textContent || '';
+        try {
+            await copyText(text.replace(/\n$/, ''));
+            button.textContent = 'Скопировано';
+            button.classList.add('copied');
+        } catch (_) {
+            button.textContent = 'Ошибка';
+        }
+        setTimeout(() => {
+            button.textContent = 'Копировать';
+            button.classList.remove('copied');
+        }, 1500);
+    }
+
+    async copyCurrentAnswer() {
+        const text = this.getCurrentResponse()
+            .replace(/^#{1,6}\s+Сказать сейчас\s*$/gm, '')
+            .replace(/^\*\*Ваш запрос\*\*\s*$/gm, '')
+            .trim();
+        if (!text) return;
+        try {
+            await copyText(text);
+            this.answerCopied = true;
+            clearTimeout(this._answerCopiedTimer);
+            this._answerCopiedTimer = setTimeout(() => (this.answerCopied = false), 1500);
+        } catch (error) {
+            console.warn('Copy failed:', error);
         }
     }
 
@@ -1049,35 +1175,42 @@ export class AssistantView extends LitElement {
                       ></interview-tools>`
                     : ''
             }
-            <div class="response-container" id="responseContainer"></div>
+            <div class="response-container" id="responseContainer" @click=${this.handleResponseClick}></div>
 
             ${
-                hasMultipleResponses
+                visible.length > 0
                     ? html`
                           <div class="response-nav">
-                              <button class="nav-btn" @click=${this.navigateToPreviousResponse} ?disabled=${position <= 0} title="Previous response">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                      <path
-                                          fill-rule="evenodd"
-                                          d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
-                                          clip-rule="evenodd"
-                                      />
-                                  </svg>
-                              </button>
-                              <span class="response-counter">${position + 1} / ${visible.length}</span>
-                              <button
-                                  class="nav-btn"
-                                  @click=${this.navigateToNextResponse}
-                                  ?disabled=${position >= visible.length - 1}
-                                  title="Next response"
-                              >
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                      <path
-                                          fill-rule="evenodd"
-                                          d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
-                                          clip-rule="evenodd"
-                                      />
-                                  </svg>
+                              ${
+                                  hasMultipleResponses
+                                      ? html`<button class="nav-btn" @click=${this.navigateToPreviousResponse} ?disabled=${position <= 0} title="Previous response">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path
+                                                        fill-rule="evenodd"
+                                                        d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
+                                                        clip-rule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <span class="response-counter">${position + 1} / ${visible.length}</span>
+                                            <button
+                                                class="nav-btn"
+                                                @click=${this.navigateToNextResponse}
+                                                ?disabled=${position >= visible.length - 1}
+                                                title="Next response"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path
+                                                        fill-rule="evenodd"
+                                                        d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
+                                                        clip-rule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>`
+                                      : ''
+                              }
+                              <button class="copy-answer ${this.answerCopied ? 'copied' : ''}" title="Копировать ответ" @click=${this.copyCurrentAnswer}>
+                                  ${this.answerCopied ? 'Скопировано' : 'Копировать ответ'}
                               </button>
                           </div>
                       `

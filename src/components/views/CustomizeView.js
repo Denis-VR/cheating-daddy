@@ -313,6 +313,8 @@ export class CustomizeView extends LitElement {
             focusMode: isMac ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
             increaseFont: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
             decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
+            decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
+            increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
         };
     }
 
@@ -331,6 +333,8 @@ export class CustomizeView extends LitElement {
             { key: 'focusMode', name: 'Только ответ / настройки', description: 'Переключить режим чтения' },
             { key: 'increaseFont', name: 'Увеличить шрифт ответа', description: 'Увеличить шрифт во время сессии' },
             { key: 'decreaseFont', name: 'Уменьшить шрифт ответа', description: 'Уменьшить шрифт во время сессии' },
+            { key: 'decreaseOpacity', name: 'Прозрачнее окно', description: 'Сделать окно прозрачнее, чтобы видеть экран под ним' },
+            { key: 'increaseOpacity', name: 'Плотнее окно', description: 'Сделать окно менее прозрачным' },
             { key: 'scrollDown', name: 'Scroll Response Down', description: 'Scroll response content downward' },
         ];
     }

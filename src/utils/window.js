@@ -6,6 +6,12 @@ let mouseEventsIgnored = false;
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 380, height: 240 };
+const OPACITY_RANGE = { min: 0.2, max: 1, step: 0.1 };
+
+function clampOpacity(value) {
+    if (!Number.isFinite(value)) return OPACITY_RANGE.max;
+    return Math.round(Math.max(OPACITY_RANGE.min, Math.min(OPACITY_RANGE.max, value)) * 10) / 10;
+}
 
 function createWindow(sendToRenderer, geminiSessionRef) {
     let windowWidth = DEFAULT_MAIN_WINDOW_SIZE.width;
@@ -55,6 +61,8 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     );
 
     mainWindow.setContentProtection(storage.getConfig().showInScreenSharing !== true);
+    const savedOpacity = storage.getConfig().windowOpacity;
+    if (savedOpacity !== undefined) mainWindow.setOpacity?.(clampOpacity(savedOpacity));
     if (process.platform === 'win32') {
         mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
@@ -118,6 +126,8 @@ function getDefaultKeybinds() {
         focusMode: isMac ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
         increaseFont: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
         decreaseFont: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
+        decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
+        increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
@@ -140,6 +150,17 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             } catch (error) {
                 console.error('Font shortcut unavailable:', error.message);
             }
+        }
+    }
+    for (const [action, direction] of [
+        ['increaseOpacity', 1],
+        ['decreaseOpacity', -1],
+    ]) {
+        if (!keybinds[action]) continue;
+        try {
+            globalShortcut.register(keybinds[action], () => stepWindowOpacity(mainWindow, sendToRenderer, direction));
+        } catch (error) {
+            console.error('Opacity shortcut unavailable:', error.message);
         }
     }
     if (mainWindow._fontInputHandler) mainWindow.webContents.removeListener?.('before-input-event', mainWindow._fontInputHandler);
@@ -346,6 +367,17 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     }
 }
 
+function stepWindowOpacity(mainWindow, sendToRenderer, direction) {
+    if (mainWindow.isDestroyed() || !mainWindow.getOpacity) return;
+    const now = Date.now();
+    if (now - (mainWindow._lastOpacityStep || 0) < 80) return;
+    mainWindow._lastOpacityStep = now;
+    const next = clampOpacity(mainWindow.getOpacity() + direction * OPACITY_RANGE.step);
+    mainWindow.setOpacity(next);
+    storage.setConfig({ windowOpacity: next });
+    sendToRenderer('window-opacity-changed', next);
+}
+
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.removeHandler('set-screen-sharing-visibility');
     ipcMain.handle('set-screen-sharing-visibility', (event, visible) => {
@@ -437,6 +469,8 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 }
 
 module.exports = {
+    clampOpacity,
+    stepWindowOpacity,
     createWindow,
     getDefaultKeybinds,
     updateGlobalShortcuts,
