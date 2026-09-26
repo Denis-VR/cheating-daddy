@@ -8,7 +8,8 @@ module.exports = {
         osxSign: process.env.CD_SIGN_IDENTITY
             ? { identity: process.env.CD_SIGN_IDENTITY, optionsForFile: () => ({ entitlements: 'entitlements.plist' }) }
             : undefined,
-        extraResource: ['./src/assets/SystemAudioDump'],
+        // SystemAudioDump is a macOS binary; Windows and Linux capture system audio through loopback.
+        extraResource: process.platform === 'darwin' ? ['./src/assets/SystemAudioDump'] : [],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
         // use `security find-identity -v -p codesigning` to find your identity
@@ -39,6 +40,7 @@ module.exports = {
                 shortcutName: 'Cheating Daddy',
                 createDesktopShortcut: true,
                 createStartMenuShortcut: true,
+                setupIcon: 'src/assets/logo.ico',
             },
         },
         {

@@ -112,10 +112,10 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
     return {
-        moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
-        moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
-        moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
-        moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
+        moveUp: 'Ctrl+Alt+Shift+Up',
+        moveDown: 'Ctrl+Alt+Shift+Down',
+        moveLeft: 'Ctrl+Alt+Shift+Left',
+        moveRight: 'Ctrl+Alt+Shift+Right',
         toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
         toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
         nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
@@ -375,6 +375,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     }
 }
 
+function captureHint() {
+    return process.platform === 'darwin'
+        ? 'Проверьте разрешение записи экрана macOS.'
+        : 'Закройте программы, которые блокируют захват экрана, и повторите.';
+}
+
 function stepWindowOpacity(mainWindow, sendToRenderer, direction) {
     if (mainWindow.isDestroyed() || !mainWindow.getOpacity) return;
     const now = Date.now();
@@ -415,12 +421,12 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             const sources = await Promise.race([
                 desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1920, height: 1080 }, fetchWindowIcons: false }),
                 new Promise((_, reject) => {
-                    timeout = setTimeout(() => reject(new Error('Снимок не получен за 10 секунд. Проверьте разрешение записи экрана macOS.')), 10000);
+                    timeout = setTimeout(() => reject(new Error(`Снимок не получен за 10 секунд. ${captureHint()}`)), 10000);
                 }),
             ]);
             const display = screen.getDisplayMatching(mainWindow.getBounds());
             const source = sources.find(item => item.display_id === String(display.id)) || sources[0];
-            if (!source || source.thumbnail.isEmpty()) throw new Error('Пустой снимок. Проверьте разрешение записи экрана macOS.');
+            if (!source || source.thumbnail.isEmpty()) throw new Error(`Пустой снимок. ${captureHint()}`);
             return { success: true, data: source.thumbnail.toJPEG(90).toString('base64') };
         } catch (error) {
             return { success: false, error: error.message };
@@ -443,6 +449,21 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 mainWindow.setIgnoreMouseEvents(false);
             }
         }
+    });
+
+    // Transparent frameless windows cannot be resized from their edges on Windows; the renderer draws a grip instead.
+    ipcMain.removeHandler('window-get-size');
+    ipcMain.handle('window-get-size', event => {
+        if (event.sender !== mainWindow.webContents || mainWindow.isDestroyed()) return null;
+        return mainWindow.getSize();
+    });
+    ipcMain.on('window-set-size', (event, size) => {
+        if (event.sender !== mainWindow.webContents || mainWindow.isDestroyed()) return;
+        if (!size || !Number.isFinite(size.width) || !Number.isFinite(size.height)) return;
+        const area = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
+        const width = Math.round(Math.max(MIN_WINDOW_SIZE.width, Math.min(size.width, area.width)));
+        const height = Math.round(Math.max(MIN_WINDOW_SIZE.height, Math.min(size.height, area.height)));
+        mainWindow.setSize(width, height);
     });
 
     ipcMain.handle('window-minimize', () => {

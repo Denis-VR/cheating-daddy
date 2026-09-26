@@ -5,7 +5,7 @@ const fs = require('node:fs');
 function loadClass(file, name, extras = {}) {
     const source = fs
         .readFileSync(file, 'utf8')
-        .replace(/^import .*;\n/gm, '')
+        .replace(/^import .*;\r?\n/gm, '')
         .replace(`export class ${name}`, `class ${name}`);
     const context = { crypto: require('node:crypto'), ...extras, LitElement: class {}, html() {}, css() {}, customElements: { define() {} } };
     vm.createContext(context);

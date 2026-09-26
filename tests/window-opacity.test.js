@@ -62,6 +62,54 @@ test('default keybinds include opacity shortcuts that do not clash with other ac
     const keybinds = api.getDefaultKeybinds();
     assert.equal(keybinds.decreaseOpacity, 'Cmd+Alt+Left');
     assert.equal(keybinds.increaseOpacity, 'Cmd+Alt+Right');
+    // Window movement must not steal Ctrl/Option+arrow word navigation in the interviewer's editor.
+    for (const direction of ['Up', 'Down', 'Left', 'Right']) assert.equal(keybinds[`move${direction}`], `Ctrl+Alt+Shift+${direction}`);
     const values = Object.values(keybinds);
     assert.equal(new Set(values).size, values.length);
+});
+
+test('resize grip requests are clamped to the minimum size and the current work area', () => {
+    const handlers = new Map();
+    const listeners = new Map();
+    let size = null;
+    const webContents = {};
+    const win = {
+        webContents,
+        isDestroyed: () => false,
+        getBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }),
+        getSize: () => [800, 600],
+        setSize: (width, height) => {
+            size = [width, height];
+        },
+    };
+    const context = {
+        module: { exports: {} },
+        __dirname: process.cwd() + '/src/utils',
+        process: { platform: 'win32' },
+        console,
+        require: name =>
+            name === 'electron'
+                ? {
+                      BrowserWindow: class {},
+                      globalShortcut: {},
+                      screen: { getDisplayMatching: () => ({ workArea: { width: 1280, height: 720 } }) },
+                      ipcMain: {
+                          handle: (channel, fn) => handlers.set(channel, fn),
+                          removeHandler: () => {},
+                          on: (channel, fn) => listeners.set(channel, fn),
+                      },
+                  }
+                : name === '../storage'
+                  ? { getConfig: () => ({}), setConfig() {} }
+                  : require(name),
+    };
+    vm.runInNewContext(fs.readFileSync('src/utils/window.js', 'utf8'), context);
+    context.module.exports.setupWindowIpcHandlers(win, () => {}, { current: null });
+
+    assert.deepEqual(handlers.get('window-get-size')({ sender: webContents }), [800, 600]);
+    assert.equal(handlers.get('window-get-size')({ sender: {} }), null);
+    listeners.get('window-set-size')({ sender: webContents }, { width: 5000, height: 100 });
+    assert.deepEqual(size, [1280, 240]);
+    listeners.get('window-set-size')({ sender: {} }, { width: 900, height: 700 });
+    assert.deepEqual(size, [1280, 240]);
 });

@@ -1313,7 +1313,7 @@ export class AssistantView extends LitElement {
                         ? html`<button class="analyze-btn" @click=${() => this.changeFontSize(-2)}>A−</button>
                               <button
                                   class="analyze-btn"
-                                  title="Вернуть панели (Cmd/Ctrl+Shift+F)"
+                                  title=${`Вернуть панели (${window.cheatingDaddy.modKey}+Shift+F)`}
                                   @click=${() => {
                                       owner.focusMode = !owner.focusMode;
                                   }}
@@ -1359,7 +1359,7 @@ export class AssistantView extends LitElement {
                                   <button
                                       class="nav-text-btn ${this.teleprompterOn ? 'on' : ''}"
                                       aria-pressed=${this.teleprompterOn}
-                                      title="Автопрокрутка ответа (Cmd/Ctrl+Alt+S)"
+                                      title=${`Автопрокрутка ответа (${window.cheatingDaddy.modKey}+Alt+S)`}
                                       @click=${this.toggleTeleprompter}
                                   >
                                       ${this.teleprompterOn ? '❚❚ Суфлёр' : '▶ Суфлёр'}

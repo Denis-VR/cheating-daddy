@@ -299,10 +299,10 @@ export class CustomizeView extends LitElement {
     getDefaultKeybinds() {
         const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
         return {
-            moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
-            moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
-            moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
-            moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
+            moveUp: 'Ctrl+Alt+Shift+Up',
+            moveDown: 'Ctrl+Alt+Shift+Down',
+            moveLeft: 'Ctrl+Alt+Shift+Left',
+            moveRight: 'Ctrl+Alt+Shift+Right',
             toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
@@ -455,7 +455,8 @@ export class CustomizeView extends LitElement {
         e.preventDefault();
         const modifiers = [];
         if (e.ctrlKey) modifiers.push('Ctrl');
-        if (e.metaKey) modifiers.push('Cmd');
+        // Electron's Cmd modifier exists only on macOS; the Windows key maps to Super.
+        if (e.metaKey) modifiers.push(cheatingDaddy.isMacOS ? 'Cmd' : 'Super');
         if (e.altKey) modifiers.push('Alt');
         if (e.shiftKey) modifiers.push('Shift');
         let mainKey = e.key;

@@ -109,10 +109,10 @@ export class HelpView extends LitElement {
     getDefaultKeybinds() {
         const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
         return {
-            moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
-            moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
-            moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
-            moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
+            moveUp: 'Ctrl+Alt+Shift+Up',
+            moveDown: 'Ctrl+Alt+Shift+Down',
+            moveLeft: 'Ctrl+Alt+Shift+Left',
+            moveRight: 'Ctrl+Alt+Shift+Right',
             toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
@@ -206,10 +206,15 @@ export class HelpView extends LitElement {
                                 'Сбой, повтор и восстановление',
                                 'Приложение периодически сохраняет текущие темы, черновик и положение чтения. После перезапуска Home предложит продолжить незавершённую сессию. При ошибке сети нажмите «Повторить запрос» у нужного ответа. Запросы сами повторно не отправляются. Последние изменения перед внезапным сбоем могут не успеть сохраниться.',
                             ],
-                            [
-                                'Разрешения macOS',
-                                'Для захвата нужны разрешения на запись экрана и системного звука, для микрофона — отдельное разрешение. Выдайте их именно запускаемой копии приложения в System Settings → Privacy & Security, затем полностью закройте приложение через Cmd+Q и откройте снова.',
-                            ],
+                            cheatingDaddy.isWindows
+                                ? [
+                                      'Windows: звук, микрофон и демонстрация экрана',
+                                      'Системный звук захватывается автоматически, отдельных разрешений не нужно. Для микрофона включите «Разрешить классическим приложениям доступ к микрофону» в Параметры → Конфиденциальность → Микрофон. Скрытие окна от демонстрации экрана работает на Windows 10 версии 2004 и новее. Проверьте его заранее в своей программе созвона со второго устройства. Если Ctrl+Alt со стрелками поворачивает экран (драйвер Intel), переназначьте эти сочетания в Settings → Keyboard Shortcuts.',
+                                  ]
+                                : [
+                                      'Разрешения macOS',
+                                      'Для захвата нужны разрешения на запись экрана и системного звука, для микрофона — отдельное разрешение. Выдайте их именно запускаемой копии приложения в System Settings → Privacy & Security, затем полностью закройте приложение через Cmd+Q и откройте снова.',
+                                  ],
                         ].map(
                             ([title, body]) =>
                                 html`<details>
