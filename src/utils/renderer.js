@@ -370,9 +370,10 @@ async function startCaptureImpl(attempt, screenshotIntervalSeconds = 5, imageQua
                     audio: {
                         sampleRate: SAMPLE_RATE,
                         channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
+                        // Loopback carries the interviewer's voice; voice processing would distort it.
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
                     },
                 },
                 attempt
@@ -1191,6 +1192,9 @@ const cheatingDaddy = {
     // Platform detection
     isLinux: isLinux,
     isMacOS: isMacOS,
+    isWindows: process.platform === 'win32',
+    // Primary modifier for shortcut hints shown in the UI.
+    modKey: isMacOS ? 'Cmd' : 'Ctrl',
 };
 
 // Make it globally available

@@ -329,6 +329,31 @@ export class CheatingDaddyApp extends LitElement {
             color: var(--text-primary);
         }
 
+        .resize-grip {
+            position: fixed;
+            right: 3px;
+            bottom: 3px;
+            z-index: 10000;
+            width: 14px;
+            height: 14px;
+            cursor: nwse-resize;
+            -webkit-app-region: no-drag;
+            opacity: 0.45;
+            background: linear-gradient(
+                135deg,
+                transparent 0 45%,
+                var(--text-muted) 45% 52%,
+                transparent 52% 68%,
+                var(--text-muted) 68% 75%,
+                transparent 75%
+            );
+            border-bottom-right-radius: 9px;
+        }
+
+        .resize-grip:hover {
+            opacity: 1;
+        }
+
         .live-indicator {
             display: flex;
             align-items: center;
@@ -1422,7 +1447,7 @@ export class CheatingDaddyApp extends LitElement {
                     ${this._opacityHint ? html`<span class="live-bar-text">Видимость ${this._opacityHint}%</span>` : ''}
                     ${
                         waiting > 0
-                            ? html`<button class="live-chip accent" title="Следующий ответ (Cmd/Ctrl+])" @click=${showNext}>
+                            ? html`<button class="live-chip accent" title=${`Следующий ответ (${window.cheatingDaddy.modKey}+])`} @click=${showNext}>
                                   Ждут ответы · ${waiting}
                               </button>`
                             : ''
@@ -1432,7 +1457,7 @@ export class CheatingDaddyApp extends LitElement {
                         class="live-chip"
                         ?disabled=${this._pausePending}
                         aria-pressed=${this._isPaused}
-                        title="Пауза аудио (Cmd/Ctrl+P). Текст и снимок экрана остаются доступны."
+                        title=${`Пауза аудио (${window.cheatingDaddy.modKey}+P). Текст и снимок экрана остаются доступны.`}
                         @click=${() => this.togglePause()}
                     >
                         ${this._isPaused ? 'Продолжить' : 'Пауза'}
@@ -1441,6 +1466,38 @@ export class CheatingDaddyApp extends LitElement {
                 </div>
             </div>
         `;
+    }
+
+    startResize(event) {
+        const ipc = window.require('electron').ipcRenderer;
+        const grip = event.currentTarget;
+        const start = { x: event.screenX, y: event.screenY };
+        const pointerId = event.pointerId;
+        grip.setPointerCapture(pointerId);
+        let size = null;
+        let frame = 0;
+        ipc.invoke('window-get-size').then(value => (size = value));
+        const move = e => {
+            if (!size) return;
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() =>
+                ipc.send('window-set-size', { width: size[0] + e.screenX - start.x, height: size[1] + e.screenY - start.y })
+            );
+        };
+        const stop = () => {
+            grip.removeEventListener('pointermove', move);
+            grip.removeEventListener('pointerup', stop);
+            grip.removeEventListener('pointercancel', stop);
+            if (grip.hasPointerCapture(pointerId)) grip.releasePointerCapture(pointerId);
+        };
+        grip.addEventListener('pointermove', move);
+        grip.addEventListener('pointerup', stop);
+        grip.addEventListener('pointercancel', stop);
+    }
+
+    renderResizeGrip() {
+        if (!window.cheatingDaddy?.isWindows) return '';
+        return html`<div class="resize-grip" title="Изменить размер окна" @pointerdown=${e => this.startResize(e)}></div>`;
     }
 
     render() {
@@ -1466,6 +1523,7 @@ export class CheatingDaddyApp extends LitElement {
                     ${isLive && !this.focusMode ? this.renderLiveBar() : ''}
                     <div class="content-inner ${isLive ? 'live' : ''}">${this.renderCurrentView()}</div>
                 </div>
+                ${this.renderResizeGrip()}
             </div>
         `;
     }

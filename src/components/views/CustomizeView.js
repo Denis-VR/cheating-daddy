@@ -455,7 +455,8 @@ export class CustomizeView extends LitElement {
         e.preventDefault();
         const modifiers = [];
         if (e.ctrlKey) modifiers.push('Ctrl');
-        if (e.metaKey) modifiers.push('Cmd');
+        // Electron's Cmd modifier exists only on macOS; the Windows key maps to Super.
+        if (e.metaKey) modifiers.push(cheatingDaddy.isMacOS ? 'Cmd' : 'Super');
         if (e.altKey) modifiers.push('Alt');
         if (e.shiftKey) modifiers.push('Shift');
         let mainKey = e.key;

@@ -72,14 +72,31 @@ export class SessionConsole extends LitElement {
     get owner() {
         return window.cheatingDaddy.element();
     }
-    async microphone() {
+    microphone() {
+        return this.measureAudio({
+            acquire: () => navigator.mediaDevices.getUserMedia({ audio: true }),
+            label: 'Микрофон',
+            silent: 'Микрофон: сигнал не обнаружен. Произнесите фразу и повторите.',
+            ticks: 30,
+        });
+    }
+    // Windows has no SystemAudioDump: listen to the same loopback stream the session uses.
+    systemAudio() {
+        return this.measureAudio({
+            acquire: () => navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }),
+            label: 'Системный звук',
+            silent: 'Системный звук не поступает. Включите речь или музыку и повторите проверку.',
+            ticks: 60,
+        });
+    }
+    async measureAudio({ acquire, label, silent, ticks }) {
         let stream,
             context,
             timer,
             expired = false;
         try {
             stream = await Promise.race([
-                navigator.mediaDevices.getUserMedia({ audio: true }).then(s => {
+                acquire().then(s => {
                     if (expired) {
                         s.getTracks().forEach(t => t.stop());
                         throw Error('Истекло ожидание разрешения');
@@ -89,26 +106,24 @@ export class SessionConsole extends LitElement {
                 new Promise((_, reject) => {
                     timer = setTimeout(() => {
                         expired = true;
-                        reject(Error('Микрофон: разрешение не получено за 10 секунд'));
+                        reject(Error(`${label}: разрешение не получено за 10 секунд`));
                     }, 10000);
                 }),
             ]);
             clearTimeout(timer);
+            if (!stream.getAudioTracks().length) return { ok: false, text: `${label}: аудиодорожка недоступна` };
             context = new AudioContext();
             await context.resume();
             const analyser = context.createAnalyser();
             context.createMediaStreamSource(stream).connect(analyser);
             const data = new Float32Array(analyser.fftSize);
             let peak = 0;
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < ticks; i++) {
                 analyser.getFloatTimeDomainData(data);
                 for (const n of data) peak = Math.max(peak, Math.abs(n));
                 await new Promise(r => setTimeout(r, 100));
             }
-            return {
-                ok: peak > 0.003,
-                text: peak > 0.003 ? 'Микрофон: звук поступает' : 'Микрофон: сигнал не обнаружен. Произнесите фразу и повторите.',
-            };
+            return { ok: peak > 0.003, text: peak > 0.003 ? `${label}: звук поступает` : silent };
         } catch (e) {
             return { ok: false, text: e.message };
         } finally {
@@ -131,11 +146,13 @@ export class SessionConsole extends LitElement {
                 ipc.invoke('capture-screen-draft'),
                 ['mic_only', 'both'].includes(prefs.audioMode) ? this.microphone() : Promise.resolve(null),
             ]);
+            const loopback = window.cheatingDaddy.isWindows && prefs.audioMode !== 'mic_only' ? await this.systemAudio() : null;
             if (!api.success) this.results.push({ ok: false, text: api.error });
             else {
                 const [model, audio] = api.data;
                 this.results.push({ ok: model.ok, text: model.ok ? `Модель ${model.model} отвечает за ${model.seconds} с` : model.message });
-                this.results.push({ ok: audio.ok && audio.detected, text: audio.message });
+                if (loopback) this.results.push(loopback);
+                else if (prefs.audioMode !== 'mic_only') this.results.push({ ok: audio.ok && audio.detected, text: audio.message });
             }
             this.results.push({ ok: screen.success, text: screen.success ? 'Захват экрана работает' : screen.error });
             if (mic) this.results.push(mic);
