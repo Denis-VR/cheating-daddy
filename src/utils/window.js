@@ -112,10 +112,10 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
     return {
-        moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
-        moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
-        moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
-        moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
+        moveUp: 'Ctrl+Alt+Shift+Up',
+        moveDown: 'Ctrl+Alt+Shift+Down',
+        moveLeft: 'Ctrl+Alt+Shift+Left',
+        moveRight: 'Ctrl+Alt+Shift+Right',
         toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
         toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
         nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',

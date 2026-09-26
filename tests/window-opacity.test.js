@@ -62,6 +62,8 @@ test('default keybinds include opacity shortcuts that do not clash with other ac
     const keybinds = api.getDefaultKeybinds();
     assert.equal(keybinds.decreaseOpacity, 'Cmd+Alt+Left');
     assert.equal(keybinds.increaseOpacity, 'Cmd+Alt+Right');
+    // Window movement must not steal Ctrl/Option+arrow word navigation in the interviewer's editor.
+    for (const direction of ['Up', 'Down', 'Left', 'Right']) assert.equal(keybinds[`move${direction}`], `Ctrl+Alt+Shift+${direction}`);
     const values = Object.values(keybinds);
     assert.equal(new Set(values).size, values.length);
 });
