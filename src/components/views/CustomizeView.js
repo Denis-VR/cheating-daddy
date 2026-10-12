@@ -316,6 +316,11 @@ export class CustomizeView extends LitElement {
             decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
             increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
             toggleTeleprompter: isMac ? 'Cmd+Alt+S' : 'Ctrl+Alt+S',
+            answerLatest: isMac ? 'Cmd+Shift+Enter' : 'Ctrl+Shift+Enter',
+            answerTable: isMac ? 'Cmd+Alt+1' : 'Ctrl+Alt+1',
+            answerExplain: isMac ? 'Cmd+Alt+2' : 'Ctrl+Alt+2',
+            answerDetails: isMac ? 'Cmd+Alt+3' : 'Ctrl+Alt+3',
+            answerMissed: isMac ? 'Cmd+Alt+4' : 'Ctrl+Alt+4',
             shortcutsHelp: isMac ? 'Cmd+K' : 'Ctrl+K',
         };
     }
@@ -339,6 +344,15 @@ export class CustomizeView extends LitElement {
             { key: 'decreaseOpacity', name: 'Прозрачнее окно', description: 'Сделать окно прозрачнее, чтобы видеть экран под ним' },
             { key: 'increaseOpacity', name: 'Плотнее окно', description: 'Сделать окно менее прозрачным' },
             { key: 'toggleTeleprompter', name: 'Суфлёр', description: 'Включить или выключить автопрокрутку ответа' },
+            {
+                key: 'answerLatest',
+                name: 'Ответить на последний вопрос',
+                description: 'Отправить последний распознанный вопрос собеседника без мыши',
+            },
+            { key: 'answerTable', name: 'Таблица', description: 'Свести открытый ответ в таблицу-шпаргалку' },
+            { key: 'answerExplain', name: 'Объяснить', description: 'Объяснить открытый ответ простыми словами' },
+            { key: 'answerDetails', name: 'Детали', description: 'Устройство, нюансы и доп. вопросы к открытому ответу' },
+            { key: 'answerMissed', name: 'Что я упустил', description: 'Сравнить сказанное в микрофон с ответом на экране' },
             { key: 'scrollDown', name: 'Прокрутить ответ вниз', description: 'Прокрутка ответа вниз' },
         ];
     }
@@ -619,11 +633,9 @@ export class CustomizeView extends LitElement {
                             <option value="both">Звук компьютера + микрофон</option>
                         </select>
                     </div>
-                    ${
-                        this.audioMode !== 'speaker_only'
-                            ? html` <div class="warning-callout">Микрофон отображается отдельно от речи собеседника.</div> `
-                            : ''
-                    }
+                    ${this.audioMode !== 'speaker_only'
+                        ? html` <div class="warning-callout">Микрофон отображается отдельно от речи собеседника.</div> `
+                        : ''}
                     <div class="form-group">
                         <label class="form-label">Качество снимков</label>
                         <select class="control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
@@ -645,7 +657,12 @@ export class CustomizeView extends LitElement {
                     <div class="form-group">
                         <label class="form-label">Язык распознавания</label>
                         <select class="control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
-                            ${this.getLanguages().map(language => html`<option value=${language.value} ?selected=${language.value === this.selectedLanguage}>${new Intl.DisplayNames(['ru'], { type: 'language' }).of(language.value)}</option>`)}
+                            ${this.getLanguages().map(
+                                language =>
+                                    html`<option value=${language.value} ?selected=${language.value === this.selectedLanguage}>
+                                        ${new Intl.DisplayNames(['ru'], { type: 'language' }).of(language.value)}
+                                    </option>`
+                            )}
                         </select>
                     </div>
                 </div>
@@ -749,11 +766,9 @@ export class CustomizeView extends LitElement {
                         ${this.isClearing ? 'Удаление…' : 'Удалить все данные'}
                     </button>
                 </div>
-                ${
-                    this.clearStatusMessage
-                        ? html` <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div> `
-                        : ''
-                }
+                ${this.clearStatusMessage
+                    ? html` <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div> `
+                    : ''}
             </section>
         `;
     }

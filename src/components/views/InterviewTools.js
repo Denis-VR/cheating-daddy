@@ -502,6 +502,8 @@ export class InterviewTools extends LitElement {
         this.ipc.on('audio-progress', this.onAudio);
         this.ipc.on('audio-error', this.onAudioError);
         this.ipc.on('transcript-recording', this.onRecording);
+        this.onAnswerLatest = () => this.answerLatest();
+        this.ipc.on('answer-latest-question', this.onAnswerLatest);
         this.load();
     }
     disconnectedCallback() {
@@ -511,6 +513,7 @@ export class InterviewTools extends LitElement {
         this.ipc.removeListener('audio-progress', this.onAudio);
         this.ipc.removeListener('audio-error', this.onAudioError);
         this.ipc.removeListener('transcript-recording', this.onRecording);
+        this.ipc.removeListener('answer-latest-question', this.onAnswerLatest);
         this.removeEventListener('paste', this.onPaste);
     }
     async load() {
@@ -694,6 +697,32 @@ export class InterviewTools extends LitElement {
                 if (this.inbox.length) this.selectQuestion(this.inbox[0]);
             }
             this.status = '';
+        });
+    }
+    async answerLatest() {
+        if (this.preparationOnly || this.busy) return;
+        const latest = [...this.inbox].reverse().find(q => q.channel !== 'mic');
+        if (!latest) {
+            this.status = 'Пока нет распознанных вопросов собеседника.';
+            return;
+        }
+        this.selectQuestion(latest);
+        this.manualDraftIds.delete(latest.id);
+        await this.sendQuestion();
+    }
+    async prepareStories() {
+        const resume = this.workspace.resumes?.find(r => r.id === this.workspace.activeResumeId);
+        if (!resume) {
+            this.status = 'Сначала выберите резюме в «Настройках AI».';
+            return;
+        }
+        await this.perform(async () => {
+            const result = await this.ask('Собери банк STAR-историй из моего резюме', { mode: 'stars', routing: 'new' });
+            const stories = String(result?.text || '').slice(0, 60000);
+            if (!stories.trim()) throw Error('Модель не вернула истории');
+            const next = { ...this.workspace, resumes: this.workspace.resumes.map(r => (r.id === resume.id ? { ...r, stories } : r)) };
+            this.workspace = (await this.call('workspace-save', next)).data;
+            this.status = 'STAR-истории сохранены в резюме и будут использоваться в ответах.';
         });
     }
     notifyAttachments() {
@@ -1059,6 +1088,26 @@ export class InterviewTools extends LitElement {
                 <button title="Уменьшить шрифт" @click=${() => fontStep(-2)}>A−</button>
                 <button title="Увеличить шрифт" @click=${() => fontStep(2)}>A+</button>
                 <button title="Шпаргалка горячих клавиш" @click=${() => this.ipc.invoke('toggle-shortcuts-help')}>Клавиши</button>
+            </div>
+            <div class="bar">
+                <button
+                    ?disabled=${this.busy}
+                    title="AI соберёт из резюме 5–7 историй по STAR и сохранит их: дальше ответы на поведенческие вопросы будут опираться на них"
+                    @click=${() => this.prepareStories()}
+                >
+                    ${this.workspace.resumes?.find(r => r.id === this.workspace.activeResumeId)?.stories
+                        ? 'Обновить STAR-истории'
+                        : 'Подготовить STAR-истории'}
+                </button>
+                <button
+                    title="AI задаёт вопросы по вакансии и оценивает ваши ответы"
+                    @click=${() => {
+                        this.dispatchEvent(new CustomEvent('practice-toggle', { bubbles: true, composed: true }));
+                        this.collapsed = true;
+                    }}
+                >
+                    🎯 Тренировка
+                </button>
             </div>
             <label class="bar" title="Текст речи с момента включения сохраняется локально и виден в «Истории». По умолчанию выключено.">
                 <input type="checkbox" .checked=${this.recordTranscript} @change=${() => this.toggleTranscript()} /> Сохранять текст речи в историю

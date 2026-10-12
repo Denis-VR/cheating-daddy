@@ -3,6 +3,11 @@ const { BrowserWindow } = require('electron');
 const SHORTCUT_ROWS = [
     ['toggleVisibility', 'Показать / скрыть окно', 'Прячет окно и возвращает его повторным нажатием. Сессия и запись не останавливаются.'],
     ['shortcutsHelp', 'Открыть / закрыть шпаргалку', 'Работает и когда основное окно скрыто. Escape закрывает только шпаргалку.'],
+    ['answerLatest', 'Ответить на последний вопрос', 'Отправляет последний распознанный вопрос собеседника. Удобно, когда «Авто» выключено.'],
+    ['answerTable', 'Таблица', 'Сводит открытый ответ в таблицу-шпаргалку.'],
+    ['answerExplain', 'Объяснить', 'Объясняет открытый ответ простыми словами.'],
+    ['answerDetails', 'Детали', 'Устройство, нюансы и вероятные дополнительные вопросы к открытому ответу.'],
+    ['answerMissed', 'Что я упустил', 'Сравнивает то, что вы сказали в микрофон, с ответом на экране и называет пропущенное.'],
     ['pause', 'Пауза / продолжить аудио', 'Приостанавливает обработку разговора. Ввод текста и снимки остаются доступны.'],
     [
         'nextStep',
@@ -43,8 +48,8 @@ function renderShortcutsHelp(keybinds) {
         h1{font-size:23px;margin:0 0 8px}p{color:#b9c2d1}details{border-bottom:1px solid #343a46;padding:10px 0}summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px}summary:hover{color:#a8c7ff}kbd{white-space:nowrap;background:#252c38;border:1px solid #455166;border-radius:6px;padding:3px 8px;font-size:12px}details p{margin:9px 0 2px}.note{border:1px solid #66583a;background:#29251d;border-radius:8px;padding:12px}h2{font-size:16px;margin:20px 0 4px}h2:first-child{margin-top:0}
         @media(max-width:420px){body{padding:14px}summary{flex-wrap:wrap;gap:6px}}
         </style></head><body>
-        <h2>Самое нужное</h2>${rows.slice(0, 8).join('')}
-        <h2>Чтение и управление окном</h2>${rows.slice(8).join('')}
+        <h2>Самое нужное</h2>${rows.slice(0, 13).join('')}
+        <h2>Чтение и управление окном</h2>${rows.slice(13).join('')}
         <p>Сочетания показаны с учётом ваших настроек. Меняются в «Настройки → Горячие клавиши». Полное руководство по темам, инструментам и автоответам — в разделе «Помощь» основного окна. После переназначения откройте шпаргалку заново.</p>
         </body></html>`;
 }

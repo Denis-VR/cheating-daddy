@@ -64,6 +64,12 @@ test('legacy packages migrate to independent reusable resumes and vacancies; del
         assert.equal(selected.name, 'Go');
         assert.match(selected.materials[0].text, /Real experience/);
         assert.deepEqual(JSON.parse(fs.readFileSync(file + '.v1-backup')), old);
+        const withStories = workspace.saveWorkspace({
+            ...migrated,
+            resumes: migrated.resumes.map(r => ({ ...r, stories: '**Конфликт**\nSituation: …' })),
+        });
+        assert.match(workspace.selectedPreparation(withStories).materials[1].text, /Конфликт/);
+        assert.throws(() => workspace.saveWorkspace({ ...migrated, resumes: migrated.resumes.map(r => ({ ...r, stories: 42 })) }), /Некорректный/);
         workspace.saveWorkspace({ ...migrated, resumes: [], activeResumeId: '' });
         assert.deepEqual(workspace.loadWorkspace().resumes, []);
         assert.equal(workspace.loadWorkspace().vacancies.length, 2);

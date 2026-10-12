@@ -575,6 +575,7 @@ export class CheatingDaddyApp extends LitElement {
         this.responses = [];
         this.topicMeta = [];
         this.transcriptLines = [];
+        this.micLines = [];
         this._responseIds = new Map();
         this._inlineRequests = new Map();
         this._manualRequestRevision = 0;
@@ -664,6 +665,8 @@ export class CheatingDaddyApp extends LitElement {
                     ...this.transcriptLines.slice(-11),
                     { text: line.text.trim().slice(0, 600), channel: line.channel, at: line.at },
                 ];
+                // The candidate's own speech is kept longer for "what did I miss" and practice evaluation.
+                if (line.channel === 'mic') this.micLines = [...this.micLines.slice(-59), { text: line.text.trim().slice(0, 2000), at: Date.now() }];
             });
             ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
             ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));
@@ -759,6 +762,7 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
     beginInterviewRequest(question, routing = 'auto') {
+        this._lastRequestAt = Date.now();
         const { isFollowup } = window.require('./utils/interview-workflow');
         const viewed = this.currentResponseIndex;
         let index = this.currentResponseIndex;
@@ -823,6 +827,16 @@ export class CheatingDaddyApp extends LitElement {
         this.addNewResponse('');
         this.currentResponseIndex = this.responses.length - 1;
         this.requestUpdate();
+    }
+
+    // What the candidate said aloud since the last request was sent.
+    spokenSinceLastRequest() {
+        const since = this._lastRequestAt || 0;
+        return (this.micLines || [])
+            .filter(line => line.at >= since)
+            .map(line => line.text)
+            .join(' ')
+            .slice(-8000);
     }
 
     beginManualRequest(question) {
@@ -1154,6 +1168,7 @@ export class CheatingDaddyApp extends LitElement {
         this.responses = [];
         this.topicMeta = [];
         this.transcriptLines = [];
+        this.micLines = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.sessionActive = true;

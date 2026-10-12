@@ -88,6 +88,11 @@
                 listeners.get('audio-progress')(null, { speaking: false, pending: 0 });
                 await new Promise(r => setTimeout(r, 25));
                 assert.deepEqual(sent, ['Напишите функцию поиска']);
+                tools.toggleAutoAnswers();
+                inbox.add('Как работает сборщик мусора в Go?');
+                await tools.updateComplete;
+                await tools.answerLatest();
+                assert.equal(sent.at(-1), 'Как работает сборщик мусора в Go?');
                 tools.remove();
                 assert.equal(listeners.size, 0);
                 ipcRenderer.send('interview-smoke-result', {
@@ -99,6 +104,7 @@
                         'edited draft protection',
                         'speech gating',
                         'automatic answer',
+                        'answer latest hotkey',
                         'listener cleanup',
                     ],
                 });
