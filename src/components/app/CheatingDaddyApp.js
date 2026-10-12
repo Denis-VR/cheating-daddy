@@ -258,22 +258,22 @@ export class CheatingDaddyApp extends LitElement {
             flex-wrap: wrap;
             gap: 4px;
         }
-        .session-tools button,
-        .session-tools select {
-            color: var(--text-primary);
+        .session-tools button {
+            height: 22px;
+            padding: 0 8px;
+            color: var(--text-secondary);
             background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 5px 7px;
-            font-size: 12px;
+            border: 1px solid var(--border-strong);
+            border-radius: 999px;
+            font-size: var(--font-size-xs);
+            font-family: var(--font);
+            white-space: nowrap;
             cursor: pointer;
         }
-        .session-tools svg {
-            width: 14px;
-            height: 14px;
-        }
-        .session-tools .reading-controls {
-            display: none;
+        .session-tools button:hover,
+        .session-tools button.active {
+            color: var(--text-primary);
+            border-color: var(--accent);
         }
         .live-bar-right {
             flex: 1;
@@ -1478,7 +1478,7 @@ export class CheatingDaddyApp extends LitElement {
                     ${this._opacityHint ? html`<span class="live-bar-text">Видимость ${this._opacityHint}%</span>` : ''}
                     ${waiting > 0
                         ? html`<button class="live-chip accent" title=${`Следующий ответ (${window.cheatingDaddy.modKey}+])`} @click=${showNext}>
-                              Ждут ответы · ${waiting}
+                              Новые · ${waiting}
                           </button>`
                         : ''}
                     ${this._isClickThrough ? html`<span class="live-chip warning" title="Клики проходят сквозь окно">Сквозные клики</span>` : ''}
@@ -1486,11 +1486,11 @@ export class CheatingDaddyApp extends LitElement {
                         ? html`<button
                               class="live-chip ${this.autoAnswers ? 'accent' : ''}"
                               aria-pressed=${this.autoAnswers}
-                              title="Автоматические ответы на новые вопросы"
+                              title=${`Автоответы на новые вопросы: ${this.autoAnswers ? 'включены' : 'выключены'}`}
                               @click=${() =>
                                   this.shadowRoot.querySelector('assistant-view')?.shadowRoot.querySelector('interview-tools')?.toggleAutoAnswers()}
                           >
-                              Автоответы: ${this.autoAnswers ? 'вкл' : 'выкл'}
+                              ${this.autoAnswers ? '● Авто' : 'Авто'}
                           </button>`
                         : ''}
                     ${this.statusText ? html`<span class="live-bar-text status" title=${this.statusText}>${this.statusText}</span>` : ''}
@@ -1498,17 +1498,11 @@ export class CheatingDaddyApp extends LitElement {
                         class="live-chip"
                         ?disabled=${this._pausePending}
                         aria-pressed=${this._isPaused}
-                        title=${`Пауза аудио (${window.cheatingDaddy.modKey}+P). Текст и снимок экрана остаются доступны.`}
+                        title=${`${this._isPaused ? 'Продолжить' : 'Пауза'} звука (${window.cheatingDaddy.modKey}+P). Текст и снимок экрана остаются доступны.`}
+                        aria-label=${this._isPaused ? 'Продолжить' : 'Пауза'}
                         @click=${() => this.togglePause()}
                     >
-                        ${this._isPaused ? 'Продолжить' : 'Пауза'}
-                    </button>
-                    <button
-                        class="live-chip"
-                        title="Шпаргалка горячих клавиш"
-                        @click=${() => window.require('electron').ipcRenderer.invoke('toggle-shortcuts-help')}
-                    >
-                        Клавиши
+                        ${this._isPaused ? '▶' : '❚❚'}
                     </button>
                     <button class="live-chip" title="Скрыть окно" @click=${() => this.handleHideToggle()}>Скрыть</button>
                 </div>

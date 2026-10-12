@@ -18,6 +18,9 @@ const DEFAULT_QUICK_ACTIONS = [
     },
 ];
 
+const INLINE_QUICK_ACTIONS = 3;
+const TABLE_ACTION = { label: 'Таблица', prompt: 'Сведи этот ответ в таблицу-шпаргалку' };
+
 const TELEPROMPTER_SPEED = { min: 10, max: 200, step: 10 };
 
 function clampSpeed(value) {
@@ -385,15 +388,6 @@ export class AssistantView extends LitElement {
 
         /* ── Teleprompter ── */
 
-        .tp-controls {
-            flex: 1;
-            min-width: 0;
-            flex-wrap: wrap;
-            display: flex;
-            align-items: center;
-            gap: 2px;
-        }
-
         .nav-text-btn {
             background: none;
             border: none;
@@ -430,7 +424,8 @@ export class AssistantView extends LitElement {
             min-height: 30px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
             gap: var(--space-sm);
             padding: 3px 8px;
             border-top: 1px solid var(--border);
@@ -464,9 +459,14 @@ export class AssistantView extends LitElement {
             height: 14px;
         }
 
+        .nav-group {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+
         .copy-answer {
-            position: absolute;
-            right: var(--space-md);
             background: none;
             border: none;
             color: var(--text-muted);
@@ -477,9 +477,14 @@ export class AssistantView extends LitElement {
             transition: color var(--transition);
         }
 
-        .copy-answer:hover,
+        .copy-answer:hover:not(:disabled),
         .copy-answer.copied {
             color: var(--text-primary);
+        }
+
+        .copy-answer:disabled {
+            opacity: 0.4;
+            cursor: default;
         }
 
         .response-counter {
@@ -517,14 +522,32 @@ export class AssistantView extends LitElement {
         }
         .quick-followups {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
             gap: 6px;
             padding: 0;
-            flex-shrink: 1;
+            flex: 1 1 240px;
+            min-width: 0;
+        }
+        .quick-followups::-webkit-scrollbar {
+            display: none;
+        }
+        .quick-followups.expanded {
+            flex-wrap: wrap;
         }
         .quick-followups .analyze-btn {
             font-size: 13px;
+            font-family: var(--font);
             padding: 6px 10px;
+        }
+        .quick-followups .analyze-btn.primary {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.16);
+        }
+        .quick-followups .analyze-btn:disabled {
+            opacity: 0.45;
+            cursor: default;
         }
 
         .input-bar {
@@ -651,7 +674,7 @@ export class AssistantView extends LitElement {
         answerCopied: { state: true },
         transcript: { type: Array },
         showTranscript: { state: true },
-        responseControlsHidden: { state: true },
+        actionsExpanded: { state: true },
         teleprompterOn: { state: true },
         teleprompterSpeed: { state: true },
     };
@@ -669,7 +692,7 @@ export class AssistantView extends LitElement {
         this._animFrame = null;
         this.transcript = [];
         this.showTranscript = true;
-        this.responseControlsHidden = false;
+        this.actionsExpanded = false;
         this.teleprompterOn = false;
         this.teleprompterSpeed = 30;
     }
@@ -939,14 +962,14 @@ export class AssistantView extends LitElement {
         }
     }
 
-    async handleQuickFollowup(text) {
+    async handleQuickFollowup(text, extras = {}) {
         if (this.isAnalyzing || this.currentResponseIndex < 0) return;
         const tools = this.shadowRoot.querySelector('interview-tools');
         if (!tools || tools.busy) return;
         this.isAnalyzing = true;
         try {
             await tools.perform(async () => {
-                await tools.ask(text, { routing: 'current' });
+                await tools.ask(text, { routing: 'current', ...extras });
                 tools.status = '';
             });
         } finally {
@@ -1322,8 +1345,7 @@ export class AssistantView extends LitElement {
             ${this.transcript.map(
                 (line, i) =>
                     html`<div class="transcript-line ${i === last ? 'latest' : ''}">
-                        <span class="who ${line.channel === 'mic' ? 'me' : ''}">${line.channel === 'mic' ? 'Микрофон:' : 'Звук Mac:'}</span
-                        >${line.text}
+                        <span class="who ${line.channel === 'mic' ? 'me' : ''}">${line.channel === 'mic' ? 'Я:' : 'Собеседник:'}</span>${line.text}
                     </div>`
             )}
             <button class="transcript-hide" title="Скрыть ленту речи" aria-label="Скрыть ленту речи" @click=${() => this.setShowTranscript(false)}>
@@ -1346,6 +1368,48 @@ export class AssistantView extends LitElement {
         } catch (error) {
             console.warn('Copy failed:', error);
         }
+    }
+
+    renderQuickActions() {
+        const disabled = this.isAnalyzing || this.currentResponseIndex < 0 || !this.getCurrentResponse()?.trim();
+        const button = action =>
+            html`<button class="analyze-btn" title=${action.prompt} ?disabled=${disabled} @click=${() => this.handleQuickFollowup(action.prompt)}>
+                ${action.label}
+            </button>`;
+        const shown = this.actionsExpanded ? this.quickActions : this.quickActions.slice(0, INLINE_QUICK_ACTIONS);
+        return html`<div class="quick-followups ${this.actionsExpanded ? 'expanded' : ''}" role="group" aria-label="Уточнить ответ">
+            <button
+                class="analyze-btn primary"
+                title="Показать ответ таблицей-шпаргалкой"
+                ?disabled=${disabled}
+                @click=${() => this.handleQuickFollowup(TABLE_ACTION.prompt, { mode: 'table' })}
+            >
+                ▦ ${TABLE_ACTION.label}
+            </button>
+            ${shown.map(button)}
+            ${this.actionsExpanded
+                ? html`<button
+                      class="analyze-btn"
+                      title="Изменить быстрые действия"
+                      aria-label="Изменить быстрые действия"
+                      @click=${() => {
+                          this.actionError = '';
+                          this.actionDraft = this.quickActions.map(a => ({ ...a }));
+                      }}
+                  >
+                      ✎
+                  </button>`
+                : ''}
+            <button
+                class="analyze-btn"
+                aria-expanded=${this.actionsExpanded}
+                title=${this.actionsExpanded ? 'Свернуть действия' : 'Все быстрые действия'}
+                aria-label=${this.actionsExpanded ? 'Свернуть действия' : 'Все быстрые действия'}
+                @click=${() => (this.actionsExpanded = !this.actionsExpanded)}
+            >
+                ${this.actionsExpanded ? '‹' : '⋯'}
+            </button>
+        </div>`;
     }
 
     render() {
@@ -1407,69 +1471,16 @@ export class AssistantView extends LitElement {
             ${this.renderTranscript()}
             <div class="response-container" id="responseContainer" @click=${this.handleResponseClick}></div>
 
-            ${(visible.length > 0 || this.hostedMode) && !this.responseControlsHidden
+            ${visible.length > 0 || this.hostedMode
                 ? html`
                       <div class="response-nav">
-                          <div class="tp-controls">
-                              <button
-                                  class="nav-text-btn ${this.teleprompterOn ? 'on' : ''}"
-                                  aria-pressed=${this.teleprompterOn}
-                                  title=${`Автопрокрутка ответа (${window.cheatingDaddy.modKey}+Alt+S)`}
-                                  @click=${this.toggleTeleprompter}
-                              >
-                                  ${this.teleprompterOn ? '❚❚ Суфлёр' : '▶ Суфлёр'}
-                              </button>
-                              <button class="nav-text-btn" title="Медленнее" aria-label="Медленнее" @click=${() => this.changeTeleprompterSpeed(-1)}>
-                                  −
-                              </button>
-                              <span class="tp-speed" title="Скорость, пикселей в секунду">${this.teleprompterSpeed}</span>
-                              <button class="nav-text-btn" title="Быстрее" aria-label="Быстрее" @click=${() => this.changeTeleprompterSpeed(1)}>
-                                  +
-                              </button>
-                              ${this.hostedMode || this.transcript?.length
-                                  ? html`<button
-                                        class="nav-text-btn ${this.showTranscript ? 'on' : ''}"
-                                        aria-pressed=${this.showTranscript}
-                                        title=${this.showTranscript ? 'Скрыть ленту речи' : 'Показать ленту речи'}
-                                        @click=${() => this.setShowTranscript(!this.showTranscript)}
-                                    >
-                                        Речь
-                                    </button>`
-                                  : ''}
-                              ${this.hostedMode
-                                  ? html`<div class="quick-followups" role="group" aria-label="Уточнить ответ">
-                                        ${this.quickActions.map(
-                                            action =>
-                                                html`<button
-                                                    class="analyze-btn"
-                                                    ?disabled=${this.isAnalyzing ||
-                                                    this.currentResponseIndex < 0 ||
-                                                    !this.getCurrentResponse()?.trim()}
-                                                    @click=${() => this.handleQuickFollowup(action.prompt)}
-                                                >
-                                                    ${action.label}
-                                                </button>`
-                                        )}
-                                        <button
-                                            class="analyze-btn"
-                                            title="Изменить быстрые действия"
-                                            aria-label="Изменить быстрые действия"
-                                            @click=${() => {
-                                                this.actionError = '';
-                                                this.actionDraft = this.quickActions.map(a => ({ ...a }));
-                                            }}
-                                        >
-                                            ✎
-                                        </button>
-                                    </div>`
-                                  : ''}
-                          </div>
                           ${hasMultipleResponses
-                              ? html`<button
+                              ? html`<div class="nav-group">
+                                    <button
                                         class="nav-btn"
                                         @click=${this.navigateToPreviousResponse}
                                         ?disabled=${position <= 0}
-                                        title="Предыдущий ответ"
+                                        title=${`Предыдущий ответ (${window.cheatingDaddy.modKey}+[)`}
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path
@@ -1484,7 +1495,7 @@ export class AssistantView extends LitElement {
                                         class="nav-btn"
                                         @click=${this.navigateToNextResponse}
                                         ?disabled=${position >= visible.length - 1}
-                                        title="Следующий ответ"
+                                        title=${`Следующий ответ (${window.cheatingDaddy.modKey}+])`}
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path
@@ -1493,11 +1504,57 @@ export class AssistantView extends LitElement {
                                                 clip-rule="evenodd"
                                             />
                                         </svg>
-                                    </button>`
+                                    </button>
+                                </div>`
                               : ''}
-                          <button class="copy-answer ${this.answerCopied ? 'copied' : ''}" title="Копировать ответ" @click=${this.copyCurrentAnswer}>
-                              ${this.answerCopied ? 'Скопировано' : 'Копировать ответ'}
-                          </button>
+                          ${this.hostedMode ? this.renderQuickActions() : html`<div class="quick-followups"></div>`}
+                          <div class="nav-group">
+                              <button
+                                  class="nav-text-btn ${this.teleprompterOn ? 'on' : ''}"
+                                  aria-pressed=${this.teleprompterOn}
+                                  title=${`Суфлёр: автопрокрутка ответа (${window.cheatingDaddy.modKey}+Alt+S)`}
+                                  @click=${this.toggleTeleprompter}
+                              >
+                                  ${this.teleprompterOn ? '❚❚' : '▶'} Суфлёр
+                              </button>
+                              ${this.teleprompterOn
+                                  ? html`<button
+                                            class="nav-text-btn"
+                                            title="Медленнее"
+                                            aria-label="Медленнее"
+                                            @click=${() => this.changeTeleprompterSpeed(-1)}
+                                        >
+                                            −
+                                        </button>
+                                        <span class="tp-speed" title="Скорость, пикселей в секунду">${this.teleprompterSpeed}</span>
+                                        <button
+                                            class="nav-text-btn"
+                                            title="Быстрее"
+                                            aria-label="Быстрее"
+                                            @click=${() => this.changeTeleprompterSpeed(1)}
+                                        >
+                                            +
+                                        </button>`
+                                  : ''}
+                              ${this.hostedMode || this.transcript?.length
+                                  ? html`<button
+                                        class="nav-text-btn ${this.showTranscript ? 'on' : ''}"
+                                        aria-pressed=${this.showTranscript}
+                                        title=${this.showTranscript ? 'Скрыть ленту речи' : 'Показать ленту речи'}
+                                        @click=${() => this.setShowTranscript(!this.showTranscript)}
+                                    >
+                                        Речь
+                                    </button>`
+                                  : ''}
+                              <button
+                                  class="copy-answer ${this.answerCopied ? 'copied' : ''}"
+                                  title="Копировать ответ"
+                                  ?disabled=${!this.getCurrentResponse()?.trim()}
+                                  @click=${this.copyCurrentAnswer}
+                              >
+                                  ${this.answerCopied ? 'Скопировано' : 'Копировать'}
+                              </button>
+                          </div>
                       </div>
                   `
                 : ''}
@@ -1592,12 +1649,20 @@ export class AssistantView extends LitElement {
                     <input
                         type="text"
                         id="textInput"
-                        placeholder="Напишите вопрос или задание к скриншоту..."
+                        placeholder="Вопрос или задание к скриншоту"
                         @keydown=${this.handleTextKeydown}
                         @paste=${this.handleImagePaste}
                     />
                 </div>
-                <button class="analyze-btn" ?disabled=${this.isAnalyzing} @click=${this.handleSendText}>Отправить</button>
+                <button
+                    class="analyze-btn"
+                    title="Отправить (Enter)"
+                    aria-label="Отправить"
+                    ?disabled=${this.isAnalyzing}
+                    @click=${this.handleSendText}
+                >
+                    ➤
+                </button>
                 <input
                     id="screenshotFile"
                     type="file"
@@ -1609,19 +1674,6 @@ export class AssistantView extends LitElement {
                         this.handleImageFile(file);
                     }}
                 />
-                <button
-                    class="analyze-btn"
-                    aria-label=${this.responseControlsHidden ? 'Показать панель ответа' : 'Скрыть панель ответа'}
-                    title=${this.responseControlsHidden
-                        ? 'Показать суфлёр, быстрые действия и копирование'
-                        : 'Скрыть суфлёр, быстрые действия и копирование'}
-                    aria-expanded=${!this.responseControlsHidden}
-                    @click=${() => {
-                        this.responseControlsHidden = !this.responseControlsHidden;
-                    }}
-                >
-                    ${this.responseControlsHidden ? 'Показать панель' : 'Скрыть панель'}
-                </button>
                 <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer}>
                     <canvas class="analyze-canvas"></canvas>
                     <span class="analyze-btn-content">

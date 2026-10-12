@@ -210,6 +210,11 @@ function responseInstructions(mode = 'answer') {
             base +
             '\nUse exactly these Markdown headings: ## Что уточнить, ## Идея, ## Код, ## Сложность, ## Крайние случаи, ## Как объяснить. Include runnable code and tests where useful. For Go check races, goroutine leaks, deadlocks, channel closing and context cancellation. For SQL explain NULLs, duplicates, JOIN semantics and indexes. Never claim execution unless actual test output was provided.'
         );
+    if (mode === 'table')
+        return (
+            base +
+            '\nTurn the answer the user is reading into a visual cheat sheet they can glance at while speaking. Start with one compact Markdown table: 2–4 columns, at most 7 rows, cells of a few words, no full sentences. Choose the axes that fit the topic (comparison, pros/cons, steps, complexity, when to use). After the table add at most three one-line bullets with the key phrases to say. No headings, no introduction, no closing remarks. These output requirements override conflicting length/format requirements in the selected profile.'
+        );
     if (mode === 'design')
         return (
             base +
@@ -223,7 +228,7 @@ function responseInstructions(mode = 'answer') {
 function validateRequest(input) {
     if (!input || typeof input.text !== 'string' || !input.text.trim() || input.text.length > 30000)
         throw new Error('Введите запрос до 30000 символов');
-    if (!['answer', 'technical', 'design'].includes(input.mode || 'answer')) throw new Error('Неизвестный режим');
+    if (!['answer', 'technical', 'design', 'table'].includes(input.mode || 'answer')) throw new Error('Неизвестный режим');
     if (input.context !== undefined && (typeof input.context !== 'string' || input.context.length > 30000))
         throw new Error('Слишком большой контекст');
     if (typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(input.requestId)) throw new Error('Invalid request ID');

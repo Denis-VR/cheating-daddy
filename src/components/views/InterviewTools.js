@@ -102,8 +102,7 @@ export class InterviewTools extends LitElement {
         }
         .bar > button,
         .bar select,
-        .bar summary,
-        .reading-controls button {
+        .bar summary {
             min-height: 26px;
             line-height: 16px;
             font-size: 12px;
@@ -112,11 +111,22 @@ export class InterviewTools extends LitElement {
             border-radius: 7px;
             background: var(--bg-elevated, #191919);
         }
-        .reading-controls {
-            margin-left: auto;
+        .notice {
             display: flex;
             align-items: center;
+            gap: 8px;
+            padding: 3px 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .notice button {
+            font-size: 12px;
+            padding: 2px 8px;
+        }
+        .more label.bar {
             gap: 6px;
+            color: var(--text-secondary, inherit);
+            cursor: pointer;
         }
         .panel {
             padding: 6px;
@@ -574,15 +584,6 @@ export class InterviewTools extends LitElement {
             this.status = 'Удалено';
         });
     }
-    get listeningHint() {
-        if (this.audioError) return this.audioError;
-        if (this.paused) return 'Аудио на паузе. Можно ответить вручную.';
-        if (this.audioProgress.speaking) return 'Слышу собеседника — жду конец вопроса';
-        if (this.audioProgress.pending) return `Распознаю речь · в очереди ${this.audioProgress.pending}`;
-        if (!this.autoAnswers) return 'Выберите вопрос и нажмите «Ответить сейчас»';
-        if (this.busy) return 'Готовлю ответ. Запись речи продолжается.';
-        return 'Автоответ после завершения вопроса. Неоднозначные реплики отправьте вручную.';
-    }
     async toggleTranscript() {
         try {
             this.recordTranscript = (await this.call('record-transcript', { enabled: !this.recordTranscript })).enabled;
@@ -999,79 +1000,69 @@ export class InterviewTools extends LitElement {
         </div>`;
     }
     renderToolbar() {
+        const toggle = id => {
+            if (this.tab === id) this.collapsed = !this.collapsed;
+            else {
+                this.tab = id;
+                this.collapsed = false;
+            }
+        };
+        const open = id => this.tab === id && !this.collapsed;
         return html`<div class="bar">
-            ${[
-                ['questions', 'Реплики · ' + this.inbox.length],
-                ['topics', 'Темы'],
-            ].map(
-                ([id, label]) =>
-                    html`<button
-                        class=${this.tab === id ? 'active' : ''}
-                        @click=${() => {
-                            if (this.tab === id) this.collapsed = !this.collapsed;
-                            else {
-                                this.tab = id;
-                                this.collapsed = false;
-                            }
-                        }}
-                    >
-                        ${label}
-                    </button>`
-            )}<select
-                aria-label="Инструменты"
-                .value=${['code', 'design'].includes(this.tab) ? this.tab : ''}
-                @change=${e => {
-                    this.tab = e.target.value;
-                    this.collapsed = false;
-                }}
-            >
-                <option value="">Инструменты</option>
-                <option value="code">Проверка кода</option>
-                <option value="design">System design</option>
-            </select>
-            <select aria-label="Тема ответа" .value=${this.routing} @change=${e => (this.routing = e.target.value)}>
-                <option value="auto">Определить тему</option>
-                <option value="current">Текущая тема</option>
-                <option value="new">Новая тема</option>
-            </select>
-            <select aria-label="Формат ответа" .value=${this.mode} @change=${e => (this.mode = e.target.value)}>
-                <option value="answer">Ответ</option>
-                <option value="technical">Задача</option>
-            </select>
-            <span class="reading-controls"
-                ><button
-                    title="Уменьшить шрифт"
-                    @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: -2, bubbles: true, composed: true }))}
-                >
-                    A−</button
-                ><button
-                    title="Увеличить шрифт"
-                    @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: 2, bubbles: true, composed: true }))}
-                >
-                    A+
-                </button></span
-            >
-            <button
-                title=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
-                aria-label=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
-                aria-expanded=${!this.collapsed}
-                ?disabled=${!this.tab}
-                @click=${() => {
-                    this.collapsed = !this.collapsed;
-                }}
-                style="width:26px;height:26px;padding:4px;display:grid;place-items:center"
-            >
-                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                        d=${this.collapsed ? 'M3 6l5 5 5-5' : 'M3 10l5-5 5 5'}
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    />
-                </svg>
+            <button class=${open('questions') ? 'active' : ''} title="Распознанные вопросы собеседника" @click=${() => toggle('questions')}>
+                Вопросы · ${this.inbox.length}
             </button>
+            <button
+                class=${['more', 'topics', 'code', 'design'].includes(this.tab) && !this.collapsed ? 'active' : ''}
+                title="Темы, инструменты, формат ответа, шрифт и сохранение речи"
+                aria-label="Ещё настройки"
+                @click=${() => toggle(['topics', 'code', 'design'].includes(this.tab) && !this.collapsed ? this.tab : 'more')}
+            >
+                ⋯
+            </button>
+        </div>`;
+    }
+    get liveNotice() {
+        if (this.audioError) return this.audioError;
+        if (this.paused) return 'Звук на паузе. Вопрос можно задать вручную.';
+        if (this.audioProgress.speaking) return 'Слушаю вопрос…';
+        if (this.audioProgress.pending) return `Распознаю речь · ${this.audioProgress.pending}`;
+        return '';
+    }
+    renderMore() {
+        const fontStep = detail => this.dispatchEvent(new CustomEvent('font-step', { detail, bubbles: true, composed: true }));
+        const openTool = id => {
+            this.tab = id;
+            this.collapsed = false;
+        };
+        return html`<div class="more">
+            <div class="bar">
+                <button @click=${() => openTool('topics')}>Темы</button>
+                <button @click=${() => openTool('code')}>Проверка кода</button>
+                <button @click=${() => openTool('design')}>System design</button>
+            </div>
+            <div class="bar">
+                <select
+                    aria-label="Куда добавлять ответ"
+                    title="Куда добавлять ответ"
+                    .value=${this.routing}
+                    @change=${e => (this.routing = e.target.value)}
+                >
+                    <option value="auto">Тема: определять сама</option>
+                    <option value="current">Тема: текущая</option>
+                    <option value="new">Тема: всегда новая</option>
+                </select>
+                <select aria-label="Формат ответа" title="Формат ответа" .value=${this.mode} @change=${e => (this.mode = e.target.value)}>
+                    <option value="answer">Формат: ответ</option>
+                    <option value="technical">Формат: задача с кодом</option>
+                </select>
+                <button title="Уменьшить шрифт" @click=${() => fontStep(-2)}>A−</button>
+                <button title="Увеличить шрифт" @click=${() => fontStep(2)}>A+</button>
+                <button title="Шпаргалка горячих клавиш" @click=${() => this.ipc.invoke('toggle-shortcuts-help')}>Клавиши</button>
+            </div>
+            <label class="bar" title="Текст речи с момента включения сохраняется локально и виден в «Истории». По умолчанию выключено.">
+                <input type="checkbox" .checked=${this.recordTranscript} @change=${() => this.toggleTranscript()} /> Сохранять текст речи в историю
+            </label>
         </div>`;
     }
     render() {
@@ -1080,16 +1071,10 @@ export class InterviewTools extends LitElement {
         const selectedTopics = this.selectedTopics.filter(i => owner.topicMeta?.[i] && !owner.topicMeta[i].hidden);
         const splitOptions =
             selectedTopics.length === 1 ? [...(owner._inlineRequests?.entries() || [])].filter(([, r]) => r.index === selectedTopics[0]) : [];
-        return html` ${!this.preparationOnly
-            ? html`<div class="bar">
-                  <label title="Только текст с момента включения. Хранится локально до удаления сессии.">
-                      <input type="checkbox" .checked=${this.recordTranscript} @change=${() => this.toggleTranscript()} /> Сохранять расшифровку
-                  </label>
-              </div>`
-            : ''}
-        ${!this.preparationOnly
-            ? html`<div class="bar" role="status">
-                  ${this.listeningHint}${this.audioError
+        const notice = this.preparationOnly ? '' : this.liveNotice;
+        return html` ${notice
+            ? html`<div class="notice" role="status">
+                  ${notice}${this.audioError
                       ? html`<button
                             @click=${() => {
                                 this.audioError = '';
@@ -1103,6 +1088,7 @@ export class InterviewTools extends LitElement {
         ${(!this.collapsed && this.tab && (this.tab !== 'questions' || selected)) || this.preparationOnly
             ? html`<div class="panel">
                   ${this.preparationOnly || this.tab === 'prep' ? this.renderPreparation() : ''}
+                  ${!this.preparationOnly && this.tab === 'more' ? this.renderMore() : ''}
                   ${!this.preparationOnly && this.tab === 'questions'
                       ? html`${this.inbox.map(
                             q =>
