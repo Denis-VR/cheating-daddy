@@ -506,6 +506,8 @@ test('quick followups work on pause in the current topic without modifying the c
     });
     await view.handleQuickFollowup('Почему?');
     assert.deepEqual(calls, [{ text: 'Почему?', routing: 'current' }]);
+    await view.handleQuickFollowup('Таблица', { mode: 'table' });
+    assert.deepEqual(calls[1], { text: 'Таблица', routing: 'current', mode: 'table' });
     assert.equal(view.isAnalyzing, false);
     tools.ask = async () => {
         throw Error('offline');

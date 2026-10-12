@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { QuestionInbox, isFollowup, relevantMaterials, validateRequest } = require('../src/utils/interview-workflow');
+const { QuestionInbox, isFollowup, relevantMaterials, validateRequest, responseInstructions } = require('../src/utils/interview-workflow');
 const { HostedSession } = require('../src/utils/hosted-ai');
 const stream = text => ({
     ok: true,
@@ -119,4 +119,11 @@ test('IPC request size and mode validation rejects malformed payloads', () => {
     assert.throws(() => validateRequest({ text: 'x', requestId: 'id', mode: 'shell' }));
     assert.throws(() => validateRequest({ text: 'x', requestId: '../id' }));
     assert.equal(validateRequest({ text: 'x', requestId: 'id', mode: 'design' }).mode, 'design');
+    assert.equal(validateRequest({ text: 'x', requestId: 'id', mode: 'table' }).mode, 'table');
+});
+test('table mode asks for a compact cheat-sheet table instead of the three spoken sections', () => {
+    const instructions = responseInstructions('table');
+    assert.match(instructions, /Never invent/);
+    assert.match(instructions, /Markdown table/);
+    assert.ok(!instructions.includes('Сказать сейчас'));
 });

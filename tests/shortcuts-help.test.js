@@ -91,7 +91,7 @@ test('custom shortcut values are escaped rather than inserted as markup', () => 
     assert.match(html, /default-src 'none'/);
 });
 
-test('response panel toggles without losing the answer, running teleprompter or screenshot control', () => {
+test('answer strip keeps the table button and copy in view, rare actions behind the overflow', () => {
     const source = fs
         .readFileSync('src/components/views/AssistantView.js', 'utf8')
         .replace(/^import .*;\r?\n/gm, '')
@@ -131,17 +131,20 @@ test('response panel toggles without losing the answer, running teleprompter or 
               : typeof value === 'function'
                 ? [value]
                 : [];
-    const first = view.render();
-    assert.match(flatten(first), /class="tp-controls"/);
-    const toggle = functions(first).find(fn => fn.toString().includes('this.responseControlsHidden ='));
-    assert.ok(toggle);
-    toggle();
-    const hidden = view.render();
-    assert.ok(!flatten(hidden).includes('class="tp-controls"'));
-    assert.match(flatten(hidden), /Показать панель/);
-    assert.match(flatten(hidden), /Снять экран/);
-    assert.equal(view.teleprompterOn, true);
+    const first = flatten(view.render());
+    assert.match(first, /Таблица/);
+    assert.match(first, /Копировать/);
+    assert.match(first, /Снять экран/);
+    assert.ok(!first.includes('Скрыть панель'));
+    view.teleprompterOn = false;
+    assert.ok(!flatten(view.render()).includes('class="tp-speed"'));
+    view.teleprompterOn = true;
+    assert.match(flatten(view.render()), /class="tp-speed"/);
+    view.quickActions = ['A', 'B', 'C', 'D'].map(label => ({ label, prompt: label }));
+    const collapsed = flatten(view.render());
+    assert.match(collapsed, /C\s*<\/button>/);
+    assert.ok(!/D\s*<\/button>/.test(collapsed));
+    view.actionsExpanded = true;
+    assert.match(flatten(view.render()), /D\s*<\/button>/);
     assert.deepEqual(view.responses, ['saved answer']);
-    functions(hidden).find(fn => fn.toString().includes('this.responseControlsHidden ='))();
-    assert.match(flatten(view.render()), /class="tp-controls"/);
 });

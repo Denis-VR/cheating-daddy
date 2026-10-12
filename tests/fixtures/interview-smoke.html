@@ -53,12 +53,14 @@
                 await tools.updateComplete;
                 const findButton = text => [...tools.shadowRoot.querySelectorAll('button')].find(b => b.textContent.includes(text));
                 assert.equal(tools.autoAnswers, false);
-                tools.tab = 'questions';
+                tools.tab = 'more';
                 tools.collapsed = false;
+                await tools.updateComplete;
                 assert.equal(recording, false);
                 tools.shadowRoot.querySelector('input[type=checkbox]').click();
                 await new Promise(r => setTimeout(r, 0));
                 assert.equal(recording, true);
+                tools.tab = 'questions';
                 inbox.add('В чем разница между процессом и потоком');
                 inbox.add('Какие ваши зарплатные ожидания?');
                 await tools.updateComplete;
