@@ -12,7 +12,9 @@ function loadClass(file, name, extras = {}) {
     vm.runInContext(`${source}\nglobalThis.Result = ${name};`, context);
     return context.Result;
 }
-const App = loadClass('src/components/app/CheatingDaddyApp.js', 'CheatingDaddyApp');
+const App = loadClass('src/components/app/CheatingDaddyApp.js', 'CheatingDaddyApp', {
+    window: { require: () => ({ ipcRenderer: { invoke: async () => true } }) },
+});
 function app() {
     return Object.assign(Object.create(App.prototype), {
         responses: [],
@@ -136,7 +138,8 @@ test('back clears session guards despite teardown errors and permits a new sessi
         window: {
             require: () => ({
                 ipcRenderer: {
-                    invoke: async () => {
+                    invoke: async name => {
+                        if (name === 'confirm-session-visibility') return true;
                         throw new Error('IPC failure');
                     },
                 },
@@ -174,10 +177,12 @@ test('late completion of an old startup cannot release the guard of a new startu
         _startSession: () => new Promise(r => (completeOld = r)),
     });
     const old = a.handleStart();
+    await new Promise(resolve => setImmediate(resolve));
     a._sessionGeneration++;
     a._starting = false;
     a._startSession = () => new Promise(r => (completeNew = r));
     const next = a.handleStart();
+    await new Promise(resolve => setImmediate(resolve));
     completeOld();
     await old;
     assert.equal(a._starting, true);
@@ -469,7 +474,7 @@ test('readiness prevents duplicate probes and unlocks session start after IPC fa
     });
     const panel = new Console();
     const pending = panel.check();
-    await Promise.resolve();
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(panel.busy, true);
     assert.equal(owner._preflightBusy, true);
     await panel.check();
@@ -560,4 +565,110 @@ test('quick action edits persist full prompts, preserve old actions on failure, 
     view.actionDraft = [];
     await view.saveQuickActions();
     assert.equal(view.quickActions.length, 0);
+});
+
+test('optional prose stays collapsed while code stays visible, including bold-style labels', () => {
+    for (const tag of ['H1', 'H2', 'H3', 'P']) {
+        const root = [];
+        function element(tagName, textContent = '') {
+            return {
+                tagName,
+                textContent,
+                nodeType: 1,
+                children: [],
+                get nextSibling() {
+                    return root[root.indexOf(this) + 1] || null;
+                },
+                before(node) {
+                    root.splice(root.indexOf(this), 0, node);
+                },
+                remove() {
+                    root.splice(root.indexOf(this), 1);
+                },
+                appendChild(node) {
+                    const index = root.indexOf(node);
+                    if (index >= 0) root.splice(index, 1);
+                    this.children.push(node);
+                },
+                setAttribute() {},
+                querySelectorAll() {
+                    return this.children.filter(n => ['PRE', 'TABLE'].includes(n.tagName));
+                },
+                querySelector(selector) {
+                    return selector === 'pre' && this.children.find(n => n.tagName === 'PRE');
+                },
+            };
+        }
+        const explain = element(tag, 'Объяснить'),
+            code = element('PRE', 'fmt.Println("example")');
+        const deep = element(tag, 'Углубиться'),
+            paragraph = element('P', 'Technical details');
+        root.push(explain, code, deep, paragraph);
+        const doc = {
+            createElement: element,
+            querySelectorAll: selector => (selector.includes('h1') ? [explain, deep, paragraph] : []),
+            body: { childNodes: [], innerHTML: '' },
+        };
+        const View = loadClass('src/components/views/AssistantView.js', 'AssistantView', {
+            window: {},
+            DOMParser: class {
+                parseFromString() {
+                    return doc;
+                }
+            },
+        });
+        Object.create(View.prototype).wrapWordsInSpans('');
+        assert.equal(root.length, 3);
+        assert.equal(root[1].open, false);
+        assert.equal(root[2].open, false);
+        assert.equal(root[0].children[1], code);
+        assert.equal(root[2].children[1], paragraph);
+        assert.equal(root[1].children[0].textContent, 'Объяснить');
+        assert.equal(root[2].children[0].textContent, 'Углубиться');
+    }
+});
+
+test('streaming preserves user section expansion but a new answer starts collapsed', () => {
+    const View = loadClass('src/components/views/AssistantView.js', 'AssistantView');
+    let sections = [];
+    const container = {
+        scrollTop: 120,
+        querySelectorAll: selector => (selector === 'details' ? sections : []),
+        set innerHTML(_) {
+            sections = [{ open: false }, { open: false }];
+        },
+    };
+    const view = Object.assign(Object.create(View.prototype), {
+        responses: ['answer', 'other answer'],
+        currentResponseIndex: 0,
+        shadowRoot: { querySelector: () => container },
+        renderMarkdown: text => text,
+        addCopyButtons() {},
+    });
+    view.updateResponseContent();
+    assert.deepEqual(
+        sections.map(s => s.open),
+        [false, false]
+    );
+    sections[0].open = true;
+    view.responses[0] += ' streamed text';
+    view.updateResponseContent();
+    assert.deepEqual(
+        sections.map(s => s.open),
+        [true, false]
+    );
+    sections[0].open = false;
+    view.responses[0] += ' more text';
+    view.updateResponseContent();
+    assert.deepEqual(
+        sections.map(s => s.open),
+        [false, false]
+    );
+    sections[1].open = true;
+    view.currentResponseIndex = 1;
+    view.updateResponseContent();
+    assert.deepEqual(
+        sections.map(s => s.open),
+        [false, false]
+    );
 });

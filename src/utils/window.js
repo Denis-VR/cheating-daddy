@@ -1,6 +1,9 @@
 const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const storage = require('../storage');
+function toggleShortcutsHelp(mainWindow, keybinds) {
+    return require(path.join(__dirname, 'shortcuts-help')).toggleShortcutsHelp(mainWindow, keybinds);
+}
 
 let mouseEventsIgnored = false;
 
@@ -129,15 +132,21 @@ function getDefaultKeybinds() {
         decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
         increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
         toggleTeleprompter: isMac ? 'Cmd+Alt+S' : 'Ctrl+Alt+S',
+        shortcutsHelp: isMac ? 'Cmd+K' : 'Ctrl+K',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
 
 function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef) {
+    keybinds = { ...getDefaultKeybinds(), ...keybinds };
     console.log('Updating global shortcuts with:', keybinds);
 
     // Unregister all existing shortcuts
     globalShortcut.unregisterAll();
+    if (keybinds.shortcutsHelp) {
+        const registered = globalShortcut.register(keybinds.shortcutsHelp, () => toggleShortcutsHelp(mainWindow, keybinds));
+        if (!registered) console.warn('Shortcut help key is already used by another application');
+    }
     if (keybinds.focusMode) globalShortcut.register(keybinds.focusMode, () => sendToRenderer('toggle-focus-mode'));
     globalShortcut.register('CommandOrControl+P', () => sendToRenderer('toggle-session-pause'));
     if (keybinds.toggleTeleprompter) {
@@ -393,6 +402,12 @@ function stepWindowOpacity(mainWindow, sendToRenderer, direction) {
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
+    ipcMain.removeHandler('toggle-shortcuts-help');
+    ipcMain.handle('toggle-shortcuts-help', event => {
+        if (event.sender !== mainWindow.webContents || mainWindow.isDestroyed()) return { success: false };
+        toggleShortcutsHelp(mainWindow, { ...getDefaultKeybinds(), ...storage.getKeybinds() });
+        return { success: true };
+    });
     ipcMain.removeHandler('set-screen-sharing-visibility');
     ipcMain.handle('set-screen-sharing-visibility', (event, visible) => {
         if (event.sender !== mainWindow.webContents || typeof visible !== 'boolean') return { success: false, error: 'Некорректный запрос' };

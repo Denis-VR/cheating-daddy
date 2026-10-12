@@ -52,7 +52,9 @@
                 await new Promise(r => setTimeout(r, 0));
                 await tools.updateComplete;
                 const findButton = text => [...tools.shadowRoot.querySelectorAll('button')].find(b => b.textContent.includes(text));
-                assert.ok(findButton('Автоответы: выкл'));
+                assert.equal(tools.autoAnswers, false);
+                tools.tab = 'questions';
+                tools.collapsed = false;
                 assert.equal(recording, false);
                 tools.shadowRoot.querySelector('input[type=checkbox]').click();
                 await new Promise(r => setTimeout(r, 0));
@@ -76,7 +78,7 @@
                 tools.autoQueue.delay = 1;
                 const sent = [];
                 tools.ask = async text => sent.push(text);
-                findButton('Автоответы: выкл').click();
+                tools.toggleAutoAnswers();
                 inbox.add('Напишите функцию поиска');
                 listeners.get('audio-progress')(null, { speaking: true, pending: 0 });
                 await new Promise(r => setTimeout(r, 15));

@@ -36,8 +36,8 @@ async function benchmarkModels(input, { fetchImpl = fetch, signal, onResult = ()
             prefs.selectedLanguage || 'ru-RU'
         ),
         preparation: (() => {
-            const w = require('./interview-storage').loadWorkspace();
-            return w.packages.find(p => p.id === w.activePackageId);
+            const library = require('./interview-storage');
+            return library.selectedPreparation(library.loadWorkspace());
         })(),
         language: prefs.selectedLanguage || 'ru-RU',
         emit() {},

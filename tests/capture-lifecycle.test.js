@@ -4,7 +4,7 @@ const test = require('node:test'),
     vm = require('node:vm');
 test('back cancels a pending permission wait and discards its late stream; next start succeeds', async () => {
     const source = fs.readFileSync('src/utils/renderer.js', 'utf8');
-    const capture = source.slice(source.indexOf('let captureAttempt = null;'), source.indexOf('function setupLinuxMicProcessing'));
+    const capture = source.slice(source.indexOf('let captureAttempt = null;'), source.indexOf('async function setupLinuxMicProcessing'));
     const stop = source.slice(source.indexOf('function stopCapture()'), source.indexOf('// Send text message to Gemini'));
     const pending = [];
     let stopped = 0;

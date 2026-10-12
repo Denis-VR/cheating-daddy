@@ -110,6 +110,25 @@ export class AssistantView extends LitElement {
             cursor: text;
         }
 
+        .response-section {
+            margin: 12px 0;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+        }
+        .response-section > summary,
+        .response-section > summary * {
+            cursor: pointer;
+        }
+        .response-section > summary {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .response-section > summary:focus-visible {
+            outline: 2px solid var(--text-primary);
+            outline-offset: 4px;
+        }
         .response-container a {
             cursor: pointer;
         }
@@ -310,6 +329,8 @@ export class AssistantView extends LitElement {
         /* ── Live transcript ── */
 
         .transcript {
+            max-height: 140px;
+            overflow-y: auto;
             position: relative;
             flex-shrink: 0;
             padding: 6px 36px 6px var(--space-md);
@@ -365,8 +386,9 @@ export class AssistantView extends LitElement {
         /* ── Teleprompter ── */
 
         .tp-controls {
-            position: absolute;
-            left: var(--space-md);
+            flex: 1;
+            min-width: 0;
+            flex-wrap: wrap;
             display: flex;
             align-items: center;
             gap: 2px;
@@ -410,7 +432,7 @@ export class AssistantView extends LitElement {
             align-items: center;
             justify-content: center;
             gap: var(--space-sm);
-            padding: var(--space-xs) var(--space-md);
+            padding: 3px 8px;
             border-top: 1px solid var(--border);
             background: var(--bg-app);
         }
@@ -497,8 +519,8 @@ export class AssistantView extends LitElement {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
-            padding: 6px 10px;
-            flex-shrink: 0;
+            padding: 0;
+            flex-shrink: 1;
         }
         .quick-followups .analyze-btn {
             font-size: 13px;
@@ -523,7 +545,7 @@ export class AssistantView extends LitElement {
             border: 1px solid var(--border);
             border-radius: 100px;
             padding: 0 var(--space-md);
-            height: 32px;
+            height: 26px;
             transition: border-color var(--transition);
         }
 
@@ -556,9 +578,9 @@ export class AssistantView extends LitElement {
             font-size: var(--font-size-xs);
             font-family: var(--font-mono);
             white-space: nowrap;
-            padding: var(--space-xs) var(--space-md);
+            padding: 3px 8px;
             border-radius: 100px;
-            height: 32px;
+            height: 26px;
             display: flex;
             align-items: center;
             gap: 4px;
@@ -629,6 +651,7 @@ export class AssistantView extends LitElement {
         answerCopied: { state: true },
         transcript: { type: Array },
         showTranscript: { state: true },
+        responseControlsHidden: { state: true },
         teleprompterOn: { state: true },
         teleprompterSpeed: { state: true },
     };
@@ -646,26 +669,24 @@ export class AssistantView extends LitElement {
         this._animFrame = null;
         this.transcript = [];
         this.showTranscript = true;
+        this.responseControlsHidden = false;
         this.teleprompterOn = false;
         this.teleprompterSpeed = 30;
     }
 
     getProfileNames() {
         return {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
+            interview: 'Собеседование',
+            sales: 'Продажи',
+            meeting: 'Встреча',
+            presentation: 'Презентация',
+            negotiation: 'Переговоры',
+            exam: 'Экзамен',
         };
     }
 
     getCurrentResponse() {
-        const profileNames = this.getProfileNames();
-        return this.responses.length > 0 && this.currentResponseIndex >= 0
-            ? this.responses[this.currentResponseIndex]
-            : `Listening to your ${profileNames[this.selectedProfile] || 'session'}...`;
+        return this.responses.length > 0 && this.currentResponseIndex >= 0 ? this.responses[this.currentResponseIndex] : '';
     }
 
     renderMarkdown(content) {
@@ -713,12 +734,18 @@ export class AssistantView extends LitElement {
                 /* Keep escaped plain code for unsupported input. */
             }
         }
-        for (const heading of [...doc.querySelectorAll('h2, h3')]) {
+        for (const heading of [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p')]) {
+            if (heading.tagName === 'P' && !/^(Объяснить|Углубиться)\s*[:：]?$/i.test(heading.textContent.trim())) continue;
             const section = heading.textContent.trim().match(/^(Объяснить|Углубиться)(?=$|[\s(:—–-])/i)?.[1];
             if (!section) continue;
             const details = doc.createElement('details');
             const summary = doc.createElement('summary');
             summary.textContent = section[0].toUpperCase() + section.slice(1).toLowerCase();
+            details.className = 'response-section';
+            summary.title =
+                section.toLowerCase() === 'объяснить'
+                    ? 'Понятное объяснение короткого ответа. Нажмите, чтобы раскрыть.'
+                    : 'Технические детали, нюансы и крайние случаи. Нажмите, чтобы раскрыть.';
             details.open = false;
             details.appendChild(summary);
             heading.before(details);
@@ -727,7 +754,9 @@ export class AssistantView extends LitElement {
                 node &&
                 !(
                     node.nodeType === 1 &&
-                    (node.tagName === 'HR' || (/^H[1-6]$/.test(node.tagName) && Number(node.tagName[1]) <= Number(heading.tagName[1])))
+                    (node.tagName === 'HR' ||
+                        (node.tagName === 'P' && /^(Объяснить|Углубиться)\s*[:：]?$/i.test(node.textContent.trim())) ||
+                        (/^H[1-6]$/.test(node.tagName) && Number(node.tagName[1]) <= (heading.tagName === 'P' ? 2 : Number(heading.tagName[1]))))
                 )
             ) {
                 const next = node.nextSibling;
@@ -1293,7 +1322,8 @@ export class AssistantView extends LitElement {
             ${this.transcript.map(
                 (line, i) =>
                     html`<div class="transcript-line ${i === last ? 'latest' : ''}">
-                        <span class="who ${line.channel === 'mic' ? 'me' : ''}">${line.channel === 'mic' ? 'Вы:' : 'Интервьюер:'}</span>${line.text}
+                        <span class="who ${line.channel === 'mic' ? 'me' : ''}">${line.channel === 'mic' ? 'Микрофон:' : 'Звук Mac:'}</span
+                        >${line.text}
                     </div>`
             )}
             <button class="transcript-hide" title="Скрыть ленту речи" aria-label="Скрыть ленту речи" @click=${() => this.setShowTranscript(false)}>
@@ -1343,13 +1373,6 @@ export class AssistantView extends LitElement {
                               >
                                   Вернуть панели</button
                               ><button class="analyze-btn" @click=${() => this.changeFontSize(2)}>A+</button
-                              ><button
-                                  class="analyze-btn"
-                                  @click=${() => {
-                                      owner.togglePause();
-                                  }}
-                              >
-                                  ${this.paused ? 'Продолжить' : 'Пауза'}</button
                               ><button class="analyze-btn" title="Завершить сессию" @click=${() => owner.endSession()}>⏹</button>`
                         : ''
                 }
@@ -1369,6 +1392,7 @@ export class AssistantView extends LitElement {
                               this.attachments = [...e.detail];
                           }}
                           .revisionTick=${this.manualRequestRevision + this.responses.length + this.currentResponseIndex / 1000}
+                          .paused=${this.paused}
                       ></interview-tools>`
                     : ''
             }
@@ -1376,7 +1400,7 @@ export class AssistantView extends LitElement {
             <div class="response-container" id="responseContainer" @click=${this.handleResponseClick}></div>
 
             ${
-                visible.length > 0
+                (visible.length > 0 || this.hostedMode) && !this.responseControlsHidden
                     ? html`
                           <div class="response-nav">
                               <div class="tp-controls">
@@ -1401,14 +1425,42 @@ export class AssistantView extends LitElement {
                                       +
                                   </button>
                                   ${
-                                      !this.showTranscript && this.transcript?.length
+                                      this.hostedMode || this.transcript?.length
                                           ? html`<button
-                                                class="nav-text-btn"
-                                                title="Показать ленту речи"
-                                                @click=${() => this.setShowTranscript(true)}
+                                                class="nav-text-btn ${this.showTranscript ? 'on' : ''}"
+                                                aria-pressed=${this.showTranscript}
+                                                title=${this.showTranscript ? 'Скрыть ленту речи' : 'Показать ленту речи'}
+                                                @click=${() => this.setShowTranscript(!this.showTranscript)}
                                             >
                                                 Речь
                                             </button>`
+                                          : ''
+                                  }
+                                  ${
+                                      this.hostedMode
+                                          ? html`<div class="quick-followups" role="group" aria-label="Уточнить ответ">
+                                                ${this.quickActions.map(
+                                                    action =>
+                                                        html`<button
+                                                            class="analyze-btn"
+                                                            ?disabled=${this.isAnalyzing || this.currentResponseIndex < 0 || !this.getCurrentResponse()?.trim()}
+                                                            @click=${() => this.handleQuickFollowup(action.prompt)}
+                                                        >
+                                                            ${action.label}
+                                                        </button>`
+                                                )}
+                                                <button
+                                                    class="analyze-btn"
+                                                    title="Изменить быстрые действия"
+                                                    aria-label="Изменить быстрые действия"
+                                                    @click=${() => {
+                                                        this.actionError = '';
+                                                        this.actionDraft = this.quickActions.map(a => ({ ...a }));
+                                                    }}
+                                                >
+                                                    ✎
+                                                </button>
+                                            </div>`
                                           : ''
                                   }
                               </div>
@@ -1418,7 +1470,7 @@ export class AssistantView extends LitElement {
                                                 class="nav-btn"
                                                 @click=${this.navigateToPreviousResponse}
                                                 ?disabled=${position <= 0}
-                                                title="Previous response"
+                                                title="Предыдущий ответ"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                                     <path
@@ -1433,7 +1485,7 @@ export class AssistantView extends LitElement {
                                                 class="nav-btn"
                                                 @click=${this.navigateToNextResponse}
                                                 ?disabled=${position >= visible.length - 1}
-                                                title="Next response"
+                                                title="Следующий ответ"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                                     <path
@@ -1486,33 +1538,6 @@ export class AssistantView extends LitElement {
                               <option value="ocr">Распознать текст</option>
                               <option value="vision">Анализ изображения</option>
                           </select>
-                      </div>`
-                    : ''
-            }
-            ${
-                this.hostedMode
-                    ? html`<div class="quick-followups" role="group" aria-label="Уточнить ответ">
-                          ${this.quickActions.map(
-                              action =>
-                                  html`<button
-                                      class="analyze-btn"
-                                      ?disabled=${this.isAnalyzing || this.currentResponseIndex < 0 || !this.getCurrentResponse()?.trim()}
-                                      @click=${() => this.handleQuickFollowup(action.prompt)}
-                                  >
-                                      ${action.label}
-                                  </button>`
-                          )}
-                          <button
-                              class="analyze-btn"
-                              title="Изменить быстрые действия"
-                              aria-label="Изменить быстрые действия"
-                              @click=${() => {
-                                  this.actionError = '';
-                                  this.actionDraft = this.quickActions.map(a => ({ ...a }));
-                              }}
-                          >
-                              ✎
-                          </button>
                       </div>`
                     : ''
             }
@@ -1587,6 +1612,17 @@ export class AssistantView extends LitElement {
                         this.handleImageFile(file);
                     }}
                 />
+                <button
+                    class="analyze-btn"
+                    aria-label=${this.responseControlsHidden ? 'Показать панель ответа' : 'Скрыть панель ответа'}
+                    title=${this.responseControlsHidden ? 'Показать суфлёр, быстрые действия и копирование' : 'Скрыть суфлёр, быстрые действия и копирование'}
+                    aria-expanded=${!this.responseControlsHidden}
+                    @click=${() => {
+                        this.responseControlsHidden = !this.responseControlsHidden;
+                    }}
+                >
+                    ${this.responseControlsHidden ? 'Показать панель' : 'Скрыть панель'}
+                </button>
                 <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer}>
                     <canvas class="analyze-canvas"></canvas>
                     <span class="analyze-btn-content">

@@ -252,15 +252,45 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         /* Live mode top bar */
+        .session-tools .bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .session-tools button,
+        .session-tools select {
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 5px 7px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .session-tools svg {
+            width: 14px;
+            height: 14px;
+        }
+        .session-tools .reading-controls {
+            display: none;
+        }
+        .live-bar-right {
+            flex: 1;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
         .live-bar {
             position: relative;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 var(--space-md);
+            padding: 6px var(--space-md);
             background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
-            height: 36px;
+            min-height: 36px;
+            flex-shrink: 0;
+            gap: 8px;
             -webkit-app-region: drag;
         }
 
@@ -307,7 +337,7 @@ export class CheatingDaddyApp extends LitElement {
         .live-bar-right {
             display: flex;
             align-items: center;
-            gap: var(--space-sm);
+            gap: 5px;
             min-width: 0;
             -webkit-app-region: no-drag;
             z-index: 1;
@@ -392,7 +422,7 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         .live-bar-right .live-bar-text.status {
-            max-width: 220px;
+            max-width: 120px;
             overflow: hidden;
             text-overflow: ellipsis;
         }
@@ -402,7 +432,7 @@ export class CheatingDaddyApp extends LitElement {
             align-items: center;
             gap: 4px;
             height: 22px;
-            padding: 0 10px;
+            padding: 0 7px;
             border-radius: 999px;
             border: 1px solid var(--border-strong);
             background: var(--bg-elevated);
@@ -493,6 +523,7 @@ export class CheatingDaddyApp extends LitElement {
     `;
 
     static properties = {
+        autoAnswers: { state: true },
         focusMode: { state: true },
         _opacityHint: { state: true },
         transcriptLines: { state: true },
@@ -524,7 +555,7 @@ export class CheatingDaddyApp extends LitElement {
         _ending: { state: true },
         _startError: { state: true },
         _updateAvailable: { state: true },
-        _whisperDownloading: { state: true },
+        _whisperЗагрузка: { state: true },
         _localAiDownloadProgress: { state: true },
     };
 
@@ -532,6 +563,7 @@ export class CheatingDaddyApp extends LitElement {
         super();
         this.currentView = 'main';
         this.statusText = '';
+        this.autoAnswers = false;
         this.startTime = null;
         this.isRecording = false;
         this.sessionActive = false;
@@ -700,7 +732,7 @@ export class CheatingDaddyApp extends LitElement {
     // ── Status & Responses ──
 
     setStatus(text) {
-        this.statusText = text;
+        this.statusText = text === 'Paused' ? 'Пауза' : text;
         if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
             this._currentResponseIsComplete = true;
         }
@@ -972,6 +1004,7 @@ export class CheatingDaddyApp extends LitElement {
         ++this._sessionGeneration;
         // Release UI guards even if capture or an IPC call fails during teardown.
         this.sessionActive = false;
+        this.autoAnswers = false;
         this._starting = false;
         this._isPaused = false;
         this._pausePending = false;
@@ -1033,6 +1066,8 @@ export class CheatingDaddyApp extends LitElement {
         const generation = ++this._sessionGeneration;
         this._startError = '';
         try {
+            if (!(await window.require('electron').ipcRenderer.invoke('confirm-session-visibility')) || generation !== this._sessionGeneration)
+                return;
             this._restoring = !!this._resumeSnapshot;
             await this._startSession(generation);
             if (this.sessionActive && this._resumeSnapshot) await this.restoreRecovery(this._resumeSnapshot);
@@ -1046,10 +1081,11 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async _startSession(generation) {
+        this.autoAnswers = false;
         const prefs = await cheatingDaddy.storage.getPreferences();
         if (generation !== this._sessionGeneration) return;
         const providerMode = prefs.providerMode === 'cloud' ? 'byok' : prefs.providerMode || 'byok';
-        this.hostedMode = ['openai', 'openrouter'].includes(providerMode);
+        this.hostedMode = ['openai', 'openrouter', 'claude-code', 'codex'].includes(providerMode);
         this._sessionProvider = providerMode;
 
         if (providerMode === 'cloud') {
@@ -1070,7 +1106,7 @@ export class CheatingDaddyApp extends LitElement {
                 }
                 return;
             }
-        } else if (providerMode === 'openai' || providerMode === 'openrouter') {
+        } else if (['openai', 'openrouter', 'claude-code', 'codex'].includes(providerMode)) {
             const { ipcRenderer } = window.require('electron');
             const result = await ipcRenderer.invoke('initialize-hosted', {
                 provider: providerMode,
@@ -1123,6 +1159,11 @@ export class CheatingDaddyApp extends LitElement {
         this.sessionActive = true;
         this.currentView = 'assistant';
         this._startTimer();
+        const config = await cheatingDaddy.storage.getConfig();
+        if (['claude-code', 'codex'].includes(providerMode) && config.bridgeMediaProvider === 'none') {
+            this.setStatus('Текстовый режим');
+            return;
+        }
         const captured = await cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         if (generation !== this._sessionGeneration) return;
         if (!captured) {
@@ -1238,13 +1279,14 @@ export class CheatingDaddyApp extends LitElement {
             case 'main':
                 return html`
                     <div class="home-content">
-                        <session-console .recovery=${this.recovery} .review=${this.lastReview}></session-console>
                         <main-view
                             .isInitializing=${this._starting || this._ending || this._preflightBusy}
                             .errorMessage=${this._startError}
                             .selectedProfile=${this.selectedProfile}
                             .onProfileChange=${p => this.handleProfileChange(p)}
                             .onStart=${() => this.handleStart()}
+                            .recovery=${this.recovery}
+                            .review=${this.lastReview}
                             .onExternalLink=${url => this.handleExternalLinkClick(url)}
                             .whisperDownloading=${this._whisperDownloading}
                             .downloadProgress=${this._localAiDownloadProgress}
@@ -1292,6 +1334,8 @@ export class CheatingDaddyApp extends LitElement {
                         .focusMode=${this.focusMode}
                         .paused=${this._isPaused}
                         .hostedMode=${this.hostedMode}
+                        @session-toolbar-change=${() => this.requestUpdate()}
+                        @auto-answers-change=${e => (this.autoAnswers = e.detail)}
                         .manualRequestRevision=${this._manualRequestRevision}
                         .responses=${this.responses}
                         .transcript=${this.transcriptLines}
@@ -1317,7 +1361,7 @@ export class CheatingDaddyApp extends LitElement {
         const items = [
             {
                 id: 'main',
-                label: 'Home',
+                label: 'Главная',
                 icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
                     <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                         <path
@@ -1329,7 +1373,7 @@ export class CheatingDaddyApp extends LitElement {
             },
             {
                 id: 'ai-customize',
-                label: 'AI Customization',
+                label: 'Настройки AI',
                 icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
                     <path
                         fill="none"
@@ -1342,17 +1386,8 @@ export class CheatingDaddyApp extends LitElement {
                 </svg>`,
             },
             {
-                id: 'preparation',
-                label: 'Preparation',
-                icon: html`<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                    <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 5v16M3 3h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5v16h-5a4 4 0 0 0-4 2 4 4 0 0 0-4-2H3z" />
-                    </g>
-                </svg>`,
-            },
-            {
                 id: 'history',
-                label: 'History',
+                label: 'История',
                 icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
                     <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                         <path
@@ -1364,7 +1399,7 @@ export class CheatingDaddyApp extends LitElement {
             },
             {
                 id: 'customize',
-                label: 'Settings',
+                label: 'Настройки',
                 icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
                     <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                         <path
@@ -1376,7 +1411,7 @@ export class CheatingDaddyApp extends LitElement {
             },
             {
                 id: 'help',
-                label: 'Help',
+                label: 'Помощь',
                 icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
                     <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                         <path d="M12 3c7.2 0 9 1.8 9 9s-1.8 9-9 9s-9-1.8-9-9s1.8-9 9-9m0 13v.01" />
@@ -1412,14 +1447,6 @@ export class CheatingDaddyApp extends LitElement {
     renderLiveBar() {
         if (!this._isLiveMode()) return '';
 
-        const profileLabels = {
-            interview: 'Собеседование',
-            sales: 'Продажи',
-            meeting: 'Встреча',
-            presentation: 'Презентация',
-            negotiation: 'Переговоры',
-            exam: 'Экзамен',
-        };
         const waiting = this.responses.filter((_, i) => i > this.currentResponseIndex && !this.topicMeta[i]?.hidden).length;
         const showNext = () => {
             let next = this.currentResponseIndex + 1;
@@ -1442,11 +1469,12 @@ export class CheatingDaddyApp extends LitElement {
                     <div class="live-indicator" title=${this._isPaused ? 'Аудио на паузе' : 'Идёт запись'}>
                         <span class="live-dot ${this._isPaused ? 'paused' : ''}"></span>
                         <span class="live-bar-text">${this.getElapsedTime()}</span>
-                        <span class="live-bar-text profile">· ${profileLabels[this.selectedProfile] || 'Сессия'}</span>
                     </div>
                 </div>
                 <div class="live-bar-right">
-                    ${this.statusText ? html`<span class="live-bar-text status" title=${this.statusText}>${this.statusText}</span>` : ''}
+                    <div class="session-tools">
+                        ${this.shadowRoot.querySelector('assistant-view')?.shadowRoot.querySelector('interview-tools')?.renderToolbar() || ''}
+                    </div>
                     ${this._opacityHint ? html`<span class="live-bar-text">Видимость ${this._opacityHint}%</span>` : ''}
                     ${
                         waiting > 0
@@ -1456,6 +1484,19 @@ export class CheatingDaddyApp extends LitElement {
                             : ''
                     }
                     ${this._isClickThrough ? html`<span class="live-chip warning" title="Клики проходят сквозь окно">Сквозные клики</span>` : ''}
+                    ${
+                        this.hostedMode
+                            ? html`<button
+                                  class="live-chip ${this.autoAnswers ? 'accent' : ''}"
+                                  aria-pressed=${this.autoAnswers}
+                                  title="Автоматические ответы на новые вопросы"
+                                  @click=${() => this.shadowRoot.querySelector('assistant-view')?.shadowRoot.querySelector('interview-tools')?.toggleAutoAnswers()}
+                              >
+                                  Автоответы: ${this.autoAnswers ? 'вкл' : 'выкл'}
+                              </button>`
+                            : ''
+                    }
+                    ${this.statusText ? html`<span class="live-bar-text status" title=${this.statusText}>${this.statusText}</span>` : ''}
                     <button
                         class="live-chip"
                         ?disabled=${this._pausePending}
@@ -1464,6 +1505,13 @@ export class CheatingDaddyApp extends LitElement {
                         @click=${() => this.togglePause()}
                     >
                         ${this._isPaused ? 'Продолжить' : 'Пауза'}
+                    </button>
+                    <button
+                        class="live-chip"
+                        title="Шпаргалка горячих клавиш"
+                        @click=${() => window.require('electron').ipcRenderer.invoke('toggle-shortcuts-help')}
+                    >
+                        Клавиши
                     </button>
                     <button class="live-chip" title="Скрыть окно" @click=${() => this.handleHideToggle()}>Скрыть</button>
                 </div>
@@ -1515,9 +1563,9 @@ export class CheatingDaddyApp extends LitElement {
             <div class="app-shell">
                 <div class="top-drag-bar ${isLive ? 'hidden' : ''}">
                     <div class="traffic-lights">
-                        <button class="traffic-light close" @click=${() => this.handleClose()} title="Close"></button>
-                        <button class="traffic-light minimize" @click=${() => this._handleMinimize()} title="Minimize"></button>
-                        <button class="traffic-light maximize" title="Maximize"></button>
+                        <button class="traffic-light close" @click=${() => this.handleClose()} title="Закрыть"></button>
+                        <button class="traffic-light minimize" @click=${() => this._handleMinimize()} title="Свернуть"></button>
+                        <button class="traffic-light maximize" title="Развернуть"></button>
                     </div>
                     <div class="drag-region"></div>
                 </div>

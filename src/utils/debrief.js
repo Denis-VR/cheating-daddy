@@ -49,8 +49,7 @@ function buildDebriefMessages(session, preparation = null) {
 
 function activePreparation() {
     try {
-        const workspace = require('./interview-storage').loadWorkspace();
-        return workspace.packages.find(p => p.id === workspace.activePackageId) || null;
+        return require('./interview-storage').selectedPreparation();
     } catch (_) {
         return null;
     }
@@ -63,6 +62,17 @@ async function generateDebrief(sessionId, { force = false, fetchImpl = fetch } =
     if (session.debrief?.text && !force) return session.debrief;
 
     const provider = storage.getPreferences().providerMode;
+    if (['claude-code', 'codex'].includes(provider)) {
+        const model = storage.getConfig()[provider + 'Model'] || '';
+        const text = await require('./cli-bridge').runBridge({
+            provider,
+            model,
+            messages: buildDebriefMessages(session, session.vacancyName ? { name: session.vacancyName, vacancy: '' } : null),
+        });
+        const debrief = { text, model: model || provider, createdAt: Date.now() };
+        storage.saveSession(sessionId, { debrief });
+        return debrief;
+    }
     const config = PROVIDERS[provider];
     if (!config) throw new Error('ИИ-итоги доступны в режиме OpenAI или OpenRouter');
     const credentials = storage.getCredentials();
@@ -74,7 +84,12 @@ async function generateDebrief(sessionId, { force = false, fetchImpl = fetch } =
         method: 'POST',
         signal: AbortSignal.timeout(120000),
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: buildDebriefMessages(session, activePreparation()), stream: false, max_completion_tokens: 4096 }),
+        body: JSON.stringify({
+            model,
+            messages: buildDebriefMessages(session, session.vacancyName ? { name: session.vacancyName, vacancy: '' } : null),
+            stream: false,
+            max_completion_tokens: 4096,
+        }),
     });
     if (!response.ok) {
         const payload = await response.json().catch(() => ({}));

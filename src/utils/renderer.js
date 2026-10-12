@@ -277,9 +277,9 @@ async function startCaptureImpl(attempt, screenshotIntervalSeconds = 5, imageQua
                         attempt
                     );
                     console.log('macOS microphone capture started');
-                    setupLinuxMicProcessing(micStream);
+                    await setupLinuxMicProcessing(micStream);
                 } catch (micError) {
-                    console.warn('Failed to get microphone access on macOS:', micError);
+                    throw new Error('Микрофон недоступен: ' + micError.message);
                 }
             }
         } else if (isLinux) {
@@ -349,7 +349,7 @@ async function startCaptureImpl(attempt, screenshotIntervalSeconds = 5, imageQua
                     console.log('Linux microphone capture started');
 
                     // Setup audio processing for microphone on Linux
-                    setupLinuxMicProcessing(micStream);
+                    await setupLinuxMicProcessing(micStream);
                 } catch (micError) {
                     console.warn('Failed to get microphone access on Linux:', micError);
                     // Continue without microphone if permission denied
@@ -402,7 +402,7 @@ async function startCaptureImpl(attempt, screenshotIntervalSeconds = 5, imageQua
                         attempt
                     );
                     console.log('Windows microphone capture started');
-                    setupLinuxMicProcessing(micStream);
+                    await setupLinuxMicProcessing(micStream);
                 } catch (micError) {
                     console.warn('Failed to get microphone access on Windows:', micError);
                 }
@@ -427,7 +427,7 @@ async function startCaptureImpl(attempt, screenshotIntervalSeconds = 5, imageQua
     }
 }
 
-function setupLinuxMicProcessing(micStream) {
+async function setupLinuxMicProcessing(micStream) {
     microphoneStream = micStream;
     // Setup microphone audio processing for Linux
     const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
@@ -461,6 +461,7 @@ function setupLinuxMicProcessing(micStream) {
 
     micSource.connect(micProcessor);
     micProcessor.connect(micAudioContext.destination);
+    if (micAudioContext.state === 'suspended') await micAudioContext.resume();
 
     // Store processor reference for cleanup
     micAudioProcessor = micProcessor;
@@ -862,7 +863,9 @@ function handleShortcut(shortcutKey) {
         if (currentView === 'main') {
             cheatingDaddy.element().handleStart();
         } else {
-            captureManualScreenshot();
+            const assistant = cheatingDaddy.element().shadowRoot?.querySelector('assistant-view');
+            if (assistant) assistant.handleScreenAnswer();
+            else captureManualScreenshot();
         }
     }
 }

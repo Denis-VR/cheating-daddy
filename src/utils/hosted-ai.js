@@ -155,6 +155,8 @@ class HostedSession {
         fetchImpl = fetch,
         reviewAudio = false,
         preparation = null,
+        completion = null,
+        mediaEnabled = true,
         saveTranscript = () => {},
     }) {
         const config = PROVIDERS[provider];
@@ -182,6 +184,8 @@ class HostedSession {
         this.fetch = (...args) => fetchImpl(...args);
         this.reviewAudio = reviewAudio;
         this.preparation = preparation;
+        this.completion = completion;
+        this.mediaEnabled = mediaEnabled;
         this.saveTranscript = saveTranscript;
         this.recordTranscript = false;
         this.questions = new QuestionInbox(emit);
@@ -218,7 +222,7 @@ class HostedSession {
         this.publishAudioState();
     }
     audio(pcm, channel = 'system') {
-        if (!this.paused && !this.closed) this.segmenters.get(channel)?.push(pcm);
+        if (this.mediaEnabled && !this.paused && !this.closed) this.segmenters.get(channel)?.push(pcm);
         this.publishAudioState();
     }
     publishAudioState() {
@@ -416,9 +420,11 @@ class HostedSession {
                 let partial = '';
                 this.controller = new AbortController();
                 try {
+                    if (!this.mediaEnabled && (job.pcm || job.image || job.images?.length))
+                        throw Error('Выбран режим «Только текст». Включите API для распознавания речи и снимков.');
                     let text = job.text;
                     if (job.pcm) {
-                        this.emit('update-status', 'Transcribing...');
+                        this.emit('update-status', 'Распознаю речь…');
                         text = await this.transcribe(job.pcm);
                         if (!text) {
                             job.resolve({ success: true });
@@ -428,7 +434,7 @@ class HostedSession {
                     }
                     if (this.closed) throw new Error('Session closed');
                     if (job.pcm && this.reviewAudio) {
-                        if (!this.paused) this.questions.add(text, job.channel);
+                        if (!this.paused && job.channel !== 'mic') this.questions.add(text, job.channel);
                         job.resolve({ success: true, draft: true });
                         continue;
                     }
@@ -440,7 +446,10 @@ class HostedSession {
                         continue;
                     }
                     let extracted = '';
-                    if (images.length && (job.imageMode === 'ocr' || (this.provider === 'openrouter' && job.imageMode !== 'vision'))) {
+                    if (
+                        images.length &&
+                        (this.completion || job.imageMode === 'ocr' || (this.provider === 'openrouter' && job.imageMode !== 'vision'))
+                    ) {
                         this.emit('update-status', 'Распознаю текст скриншота…');
                         const parts = [];
                         for (const image of images) parts.push(await this.extractImageText(image));
@@ -452,7 +461,7 @@ class HostedSession {
                         started = true;
                     }
                     const prefix = partial;
-                    this.emit('update-status', 'Generating response...');
+                    this.emit('update-status', 'Готовлю ответ…');
                     const requestText = job.context ? `Context from the answer the user is reading:\n${job.context}\n\nUser request:\n${text}` : text;
                     const content =
                         images.length && !extracted
@@ -465,20 +474,26 @@ class HostedSession {
                     const materials = relevantMaterials(this.preparation, text);
                     const system = `${this.systemPrompt}\n${responseInstructions(job.mode)}\nVerified preparation materials (quoted reference):\n${materials || '[not provided]'}`;
                     const messages = [{ role: 'system', content: system }, ...(job.mode === 'design' ? [] : this.history), { role: 'user', content }];
-                    const { response, cleanup } = await this.request('/chat/completions', {
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ model: answerModel, messages, stream: true, max_completion_tokens: 4096 }),
-                    });
+                    const onText = fullText => {
+                        if (this.closed) return;
+                        partial = prefix + fullText;
+                        if (job.mode !== 'design') this.emit(started ? 'update-response' : 'new-response', { id, text: partial });
+                        started = true;
+                    };
                     let answer;
-                    try {
-                        answer = await readCompletion(response.body, fullText => {
-                            if (this.closed) return;
-                            partial = prefix + fullText;
-                            if (job.mode !== 'design') this.emit(started ? 'update-response' : 'new-response', { id, text: partial });
-                            started = true;
+                    if (this.completion) {
+                        answer = await this.completion(messages, this.controller.signal);
+                        onText(answer);
+                    } else {
+                        const { response, cleanup } = await this.request('/chat/completions', {
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ model: answerModel, messages, stream: true, max_completion_tokens: 4096 }),
                         });
-                    } finally {
-                        cleanup();
+                        try {
+                            answer = await readCompletion(response.body, onText);
+                        } finally {
+                            cleanup();
+                        }
                     }
                     if (this.closed) throw new Error('Session closed');
                     if (job.mode !== 'design') this.history.push({ role: 'user', content: text }, { role: 'assistant', content: answer });
@@ -489,7 +504,7 @@ class HostedSession {
                 } catch (error) {
                     const message = error.name === 'AbortError' ? 'Request cancelled or timed out' : error.message;
                     if (!this.closed && !job.ocrOnly && job.mode !== 'design')
-                        this.emit(started ? 'update-response' : 'new-response', { id, text: `${partial}${partial ? '\n\n' : ''}Error: ${message}` });
+                        this.emit(started ? 'update-response' : 'new-response', { id, text: `${partial}${partial ? '\n\n' : ''}Ошибка: ${message}` });
                     job.resolve({ success: false, error: message, displayed: !this.closed });
                 } finally {
                     this.controller = null;
@@ -497,7 +512,7 @@ class HostedSession {
             }
         } finally {
             this.running = false;
-            if (!this.closed) this.emit('update-status', this.paused ? 'Paused' : 'Listening...');
+            if (!this.closed) this.emit('update-status', this.paused ? 'Пауза' : this.mediaEnabled ? 'Listening...' : 'Текстовый режим');
         }
     }
     close() {

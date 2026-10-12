@@ -241,12 +241,12 @@ function getPreferences() {
     if (!Array.isArray(preferences.aiProfiles)) {
         const { profilePrompts, buildSystemPrompt } = require('./utils/prompts');
         const names = {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
+            interview: 'Собеседование',
+            sales: 'Продажи',
+            meeting: 'Встреча',
+            presentation: 'Презентация',
+            negotiation: 'Переговоры',
+            exam: 'Экзамен',
         };
         preferences.aiProfiles = Object.entries(profilePrompts).map(([id, parts]) => ({
             id,
@@ -254,7 +254,18 @@ function getPreferences() {
             text: buildSystemPrompt(parts, '', false),
         }));
     }
-    if (!preferences.aiProfiles.some(item => item.id === preferences.selectedProfile))
+    const oldNames = {
+        interview: ['Job Interview', 'Собеседование'],
+        sales: ['Sales Call', 'Продажи'],
+        meeting: ['Business Meeting', 'Встреча'],
+        presentation: ['Presentation', 'Презентация'],
+        negotiation: ['Negotiation', 'Переговоры'],
+        exam: ['Exam Assistant', 'Экзамен'],
+    };
+    preferences.aiProfiles = preferences.aiProfiles.map(item =>
+        oldNames[item.id]?.[0] === item.name ? { ...item, name: oldNames[item.id][1] } : item
+    );
+    if (preferences.selectedProfile !== '' && !preferences.aiProfiles.some(item => item.id === preferences.selectedProfile))
         preferences.selectedProfile = preferences.aiProfiles[0]?.id || '';
     return preferences;
 }
@@ -285,7 +296,8 @@ function setPreferences(preferences) {
         }
     }
     const updated = { ...current, ...preferences };
-    if (!updated.aiProfiles.some(item => item.id === updated.selectedProfile)) updated.selectedProfile = updated.aiProfiles[0]?.id || '';
+    if (updated.selectedProfile !== '' && !updated.aiProfiles.some(item => item.id === updated.selectedProfile))
+        updated.selectedProfile = updated.aiProfiles[0]?.id || '';
     if (!updated.instructionPresets.some(item => item.id === updated.activeInstructionId)) throw new Error('Unknown instruction preset');
     updated.customPrompt = updated.instructionPresets.find(item => item.id === updated.activeInstructionId).text;
     return writeJsonFile(getPreferencesPath(), updated);
@@ -473,6 +485,9 @@ function saveSession(sessionId, data) {
         lastUpdated: Date.now(),
         // Profile context - set once when session starts
         profile: data.profile || existingSession?.profile || null,
+        profileName: data.profileName ?? existingSession?.profileName ?? '',
+        vacancyName: data.vacancyName ?? existingSession?.vacancyName ?? '',
+        resumeName: data.resumeName ?? existingSession?.resumeName ?? '',
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
@@ -532,6 +547,9 @@ function getAllSessions() {
                         messageCount: data.conversationHistory?.length || 0,
                         screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
                         profile: data.profile || null,
+                        profileName: data.profileName || '',
+                        vacancyName: data.vacancyName || '',
+                        resumeName: data.resumeName || '',
                         customPrompt: data.customPrompt || null,
                     };
                 }

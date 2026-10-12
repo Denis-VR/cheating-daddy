@@ -453,54 +453,56 @@ export class HistoryView extends LitElement {
 
     formatDate(timestamp) {
         const date = new Date(timestamp);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
     formatTime(timestamp) {
         const date = new Date(timestamp);
-        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     }
 
     formatTimestamp(timestamp) {
         const date = new Date(timestamp);
-        return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleString('ru-RU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
     getProfileNames() {
         return {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
+            interview: 'Собеседование',
+            sales: 'Продажи',
+            meeting: 'Встреча',
+            presentation: 'Презентация',
+            negotiation: 'Переговоры',
+            exam: 'Экзамен',
         };
     }
 
     _getProfileLabel(session) {
+        if (session.vacancyName) return session.vacancyName;
+        if (session.profileName) return session.profileName;
         if (session.profile) {
             const names = this.getProfileNames();
             return names[session.profile] || session.profile;
         }
-        return 'Session';
+        return 'Сессия';
     }
 
     getSessionPreview(session) {
         const parts = [];
-        if (session.messageCount > 0) parts.push(`${session.messageCount} messages`);
-        if (session.screenAnalysisCount > 0) parts.push(`${session.screenAnalysisCount} screen`);
+        if (session.messageCount > 0) parts.push(`${session.messageCount} сообщений`);
+        if (session.screenAnalysisCount > 0) parts.push(`${session.screenAnalysisCount} снимков`);
         if (session.profile) {
             const profileNames = this.getProfileNames();
             parts.push(profileNames[session.profile] || session.profile);
         }
-        return parts.length > 0 ? parts.join(' · ') : 'Empty session';
+        return parts.length > 0 ? parts.join(' · ') : 'Пустая сессия';
     }
 
     getFilteredSessions() {
         if (!this.searchQuery.trim()) return this.sessions;
         const q = this.searchQuery.toLowerCase();
         return this.sessions.filter(session => {
-            const preview = this.getSessionPreview(session).toLowerCase();
+            const preview = [this.getSessionPreview(session), session.vacancyName, session.profileName, session.resumeName].join(' ').toLowerCase();
             const date = this.formatDate(session.createdAt).toLowerCase();
             return preview.includes(q) || date.includes(q);
         });
@@ -517,7 +519,7 @@ export class HistoryView extends LitElement {
     }
 
     renderTabContent() {
-        if (!this.selectedSession) return html`<div class="empty">Select a session.</div>`;
+        if (!this.selectedSession) return html`<div class="empty">Выберите сессию.</div>`;
 
         if (this.activeTab === 'review')
             return html`${this.renderDebrief()}
@@ -560,7 +562,7 @@ export class HistoryView extends LitElement {
         }
         if (this.activeTab === 'conversation') {
             const messages = this.collectConversation(this.selectedSession);
-            if (!messages.length) return html`<div class="empty">No conversation data.</div>`;
+            if (!messages.length) return html`<div class="empty">В сессии нет сообщений.</div>`;
             return messages.map(
                 msg => html`
                     <div class="message-row ${msg.type}">
@@ -575,7 +577,7 @@ export class HistoryView extends LitElement {
 
         if (this.activeTab === 'screen') {
             const screen = this.selectedSession.screenAnalysisHistory || [];
-            if (!screen.length) return html`<div class="empty">No screen analysis data.</div>`;
+            if (!screen.length) return html`<div class="empty">Нет снимков экрана.</div>`;
             return screen.map(
                 entry => html`
                     <div class="message-row screen">
@@ -590,14 +592,14 @@ export class HistoryView extends LitElement {
 
         const profile = this.selectedSession.profile;
         const prompt = this.selectedSession.customPrompt;
-        if (!profile && !prompt) return html`<div class="empty">No context saved for this session.</div>`;
+        if (!profile && !prompt) return html`<div class="empty">Контекст не сохранён.</div>`;
 
         return html`
             ${
                 profile
                     ? html`
                           <div class="context-row">
-                              <span class="context-key">Profile</span>
+                              <span class="context-key">Профиль</span>
                               <span class="context-value">${this.getProfileNames()[profile] || profile}</span>
                           </div>
                       `
@@ -607,7 +609,7 @@ export class HistoryView extends LitElement {
                 prompt
                     ? html`
                           <div class="context-row">
-                              <span class="context-key">Prompt</span>
+                              <span class="context-key">Инструкции</span>
                               <span class="context-value">${prompt}</span>
                           </div>
                       `
@@ -619,7 +621,7 @@ export class HistoryView extends LitElement {
     renderListView() {
         const filteredSessions = this.getFilteredSessions();
         return html`
-            <div class="page-title">History</div>
+            <div class="page-title">История</div>
             <button class="tab-btn" ?disabled=${!this.sessions.length || this.loading} @click=${() => this.deleteHistory()}>
                 Удалить всю историю
             </button>
@@ -637,13 +639,13 @@ export class HistoryView extends LitElement {
                     <circle cx="11" cy="11" r="8" />
                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <input class="control" type="text" placeholder="Search sessions..." .value=${this.searchQuery} @input=${this.handleSearchInput} />
+                <input class="control" type="text" placeholder="Поиск сессий…" .value=${this.searchQuery} @input=${this.handleSearchInput} />
             </div>
 
             <section class="list-shell">
                 <div class="sessions-list">
-                    ${this.loading ? html`<div class="empty" style="margin:var(--space-md);">Loading sessions...</div>` : ''}
-                    ${!this.loading && filteredSessions.length === 0 ? html`<div class="empty" style="margin:var(--space-md);">No matching sessions.</div>` : ''}
+                    ${this.loading ? html`<div class="empty" style="margin:var(--space-md);">Загружаю историю…</div>` : ''}
+                    ${!this.loading && filteredSessions.length === 0 ? html`<div class="empty" style="margin:var(--space-md);">Сессии не найдены.</div>` : ''}
                     ${
                         !this.loading
                             ? filteredSessions.map(
@@ -651,10 +653,11 @@ export class HistoryView extends LitElement {
                                       <div class="history-row">
                                           <button class="session-card" @click=${() => this.openSession(session.sessionId)}>
                                               <div class="session-left">
-                                                  <span class="session-profile">${this._getProfileLabel(session)}</span>
-                                                  <span class="session-date"
-                                                      >${this.formatDate(session.createdAt)} · ${this.formatTime(session.createdAt)}</span
+                                                  <span class="session-profile"
+                                                      >${this.formatDate(session.createdAt)} · ${this.formatTime(session.createdAt)} —
+                                                      ${this._getProfileLabel(session)}</span
                                                   >
+                                                  <span class="session-date">${session.resumeName || this.getSessionPreview(session)}</span>
                                               </div>
                                               ${session.messageCount > 0 ? html`<span class="session-badge">${session.messageCount}</span>` : ''}</button
                                           ><button class="tab-btn" @click=${() => this.deleteHistory(session.sessionId)}>Удалить</button>
@@ -673,7 +676,7 @@ export class HistoryView extends LitElement {
         const screenCount = this.selectedSession?.screenAnalysisHistory?.length || 0;
 
         return html`
-            <div class="page-title">Session Detail</div>
+            <div class="page-title">Сессия</div>
             <button class="tab-btn" @click=${() => this.deleteHistory(this.selectedSessionId)}>Удалить сессию</button>
             <div class="detail-top">
                 <button class="back-btn" @click=${this.closeSession}>
@@ -718,7 +721,7 @@ export class HistoryView extends LitElement {
                         this.activeTab = 'conversation';
                     }}
                 >
-                    Conversation (${conversationCount})
+                    Разговор (${conversationCount})
                 </button>
                 <button
                     class="tab-btn ${this.activeTab === 'screen' ? 'active' : ''}"

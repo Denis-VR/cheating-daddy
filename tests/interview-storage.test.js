@@ -18,9 +18,9 @@ test('preparation persists across reloads and invalid/corrupt data cannot overwr
             designVersions: [],
         };
         workspace.saveWorkspace(value);
-        assert.deepEqual(workspace.loadWorkspace(), value);
+        assert.deepEqual(workspace.loadWorkspace(), workspace.migrateWorkspace(value));
         assert.throws(() => workspace.saveWorkspace({ ...value, activePackageId: 'missing' }));
-        assert.deepEqual(workspace.loadWorkspace(), value);
+        assert.deepEqual(workspace.loadWorkspace(), workspace.migrateWorkspace(value));
         fs.writeFileSync(path.join(dir, 'interview-workspace.json'), '{bad');
         assert.throws(() => workspace.loadWorkspace(), /прочитать/);
     } finally {
@@ -34,4 +34,42 @@ test('document import preserves text and rejects unsupported, blank and oversize
     await assert.rejects(workspace.extractDocument({ name: 'cv.exe', data: encode('text') }), /Поддерживаются/);
     await assert.rejects(workspace.extractDocument({ name: 'cv.txt', data: encode('  ') }), /Текст не найден/);
     await assert.rejects(workspace.extractDocument({ name: 'cv.txt', data: encode('x'.repeat(200001)) }), /200000/);
+});
+
+test('legacy packages migrate to independent reusable resumes and vacancies; deletion survives reload', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cd-library-test-'));
+    const original = storage.getConfigDir;
+    storage.getConfigDir = () => dir;
+    try {
+        const old = {
+            packages: ['Java', 'Go'].map((name, i) => ({
+                id: String(i),
+                name,
+                vacancy: name + ' role',
+                experience: 'Queues',
+                materials: [{ name: 'CV', text: 'Real experience' }],
+            })),
+            activePackageId: '0',
+            design: {},
+            designVersions: [],
+        };
+        const file = path.join(dir, 'interview-workspace.json');
+        fs.writeFileSync(file, JSON.stringify(old));
+        const migrated = workspace.loadWorkspace();
+        assert.equal(migrated.resumes.length, 1);
+        assert.equal(migrated.vacancies.length, 2);
+        migrated.activeVacancyId = '1';
+        workspace.saveWorkspace(migrated);
+        const selected = workspace.selectedPreparation();
+        assert.equal(selected.name, 'Go');
+        assert.match(selected.materials[0].text, /Real experience/);
+        assert.deepEqual(JSON.parse(fs.readFileSync(file + '.v1-backup')), old);
+        workspace.saveWorkspace({ ...migrated, resumes: [], activeResumeId: '' });
+        assert.deepEqual(workspace.loadWorkspace().resumes, []);
+        assert.equal(workspace.loadWorkspace().vacancies.length, 2);
+        assert.throws(() => workspace.saveWorkspace({ ...migrated, activeResumeId: 'unknown' }), /не найден/);
+    } finally {
+        storage.getConfigDir = original;
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
 });

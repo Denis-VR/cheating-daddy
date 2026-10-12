@@ -36,7 +36,8 @@ test('main IPC accepts text and screen requests on pause and propagates their re
         require: name => {
             if (name === 'async_hooks') return require(name);
             if (name === './session-support') return { installSessionSupport() {} };
-            if (name === './interview-storage') return { loadWorkspace: () => ({ packages: [] }) };
+            if (name === './interview-storage')
+                return { loadWorkspace: () => ({ packages: [] }), selectedPreparation: () => ({ name: '', resumeName: '', materials: [] }) };
             if (name === './interview-workflow') return require('../src/utils/interview-workflow');
             if (name === './hosted-ai') return { HostedSession: TestSession, PROVIDERS };
             if (name === 'electron')
@@ -44,7 +45,13 @@ test('main IPC accepts text and screen requests on pause and propagates their re
                     ipcMain: { handle: (name, fn) => handlers.set(name, fn) },
                     BrowserWindow: { getAllWindows: () => [{ webContents: { send: (...args) => events.push(args) } }] },
                 };
-            if (name === '../storage') return { saveSession() {}, getConfig: () => ({}), getCredentials: () => ({ openrouterKey: 'test' }) };
+            if (name === '../storage')
+                return {
+                    saveSession() {},
+                    getPreferences: () => ({ aiProfiles: [] }),
+                    getConfig: () => ({}),
+                    getCredentials: () => ({ openrouterKey: 'test' }),
+                };
             if (name === './prompts') return { getSystemPrompt: () => 'Helpful assistant', getHostedSystemPrompt: () => 'Helpful assistant' };
             if (name === './transportLogger') return { startTransportLog() {}, closeTransportLog() {} };
             return {};
