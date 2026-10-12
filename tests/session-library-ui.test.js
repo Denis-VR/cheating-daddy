@@ -7,7 +7,7 @@ const os = require('node:os');
 function view(file, name) {
     const source = fs
         .readFileSync(file, 'utf8')
-        .replace(/^import .*;\n/gm, '')
+        .replace(/^import .*;\r?\n/gm, '')
         .replace(`export class ${name}`, `class ${name}`);
     const context = { LitElement: class {}, html() {}, css() {}, customElements: { define() {} } };
     vm.createContext(context);

@@ -118,7 +118,9 @@ test('actual tools skip edited drafts after selection changes and disable auto m
     const ipc = { on() {}, removeListener() {} };
     const source = fs
         .readFileSync('src/components/views/InterviewTools.js', 'utf8')
-        .replace(/^import .*;\n/gm, '')
+        // Exercise Windows checkout line endings on every platform.
+        .replace(/\r?\n/g, '\r\n')
+        .replace(/^import .*;\r?\n/gm, '')
         .replace('export class InterviewTools', 'class InterviewTools');
     const context = {
         LitElement: class {

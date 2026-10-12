@@ -20,12 +20,12 @@ function isFollowup(text, previous = '') {
 }
 // Conservative heuristic: drafts remain editable; only explicit questions/tasks are sent automatically.
 function isAnswerCandidate(text) {
-    return /\?|(?:^|[.!]\s+)(?:а\s+)?(?:как|почему|зачем|что|какой|какая|какие|чем|сколько|где|когда|расскажи|расскажите|объясни|объясните|опиши|опишите|сравни|напиши|реши|покажи|можешь|можете|how|why|what|when|where|which|explain|describe|tell me|can you)(?=\s|[?!.,:]|$)/iu.test(
+    return /\?|(?:^|[.!]\s+)(?:а\s+)?(?:как|почему|зачем|что|какой|какая|какие|чем|сколько|где|когда|в ч[её]м|есть ли|был ли|была ли|были ли|приходилось ли|доводилось ли|расскажи(?:те)?|объясни(?:те)?|опиши(?:те)?|сравни(?:те)?|напиши(?:те)?|реши(?:те)?|покажи(?:те)?|можешь|можете|how|why|what|when|where|which|explain|describe|compare|write|implement|tell me|can you|could you|have you|do you|is there)(?=\s|[?!.,:]|$)/iu.test(
         text
     );
 }
 class AutoAnswerQueue {
-    constructor(send, { delay = 5500, schedule = setTimeout, cancel = clearTimeout } = {}) {
+    constructor(send, { delay = 1400, schedule = setTimeout, cancel = clearTimeout } = {}) {
         this.send = send;
         this.delay = delay;
         this.schedule = (...args) => schedule(...args);
@@ -37,6 +37,8 @@ class AutoAnswerQueue {
         this.items = [];
         this.seen = new Set();
         this.timer = null;
+        this.pendingKey = null;
+        this.waitingForSpeech = false;
     }
     key(item) {
         return `${item.id}:${item.revision}`;
@@ -49,27 +51,36 @@ class AutoAnswerQueue {
     }
     update(items) {
         this.items = items;
+        const item = items.find(q => q.channel !== 'mic' && !this.seen.has(this.key(q)) && isAnswerCandidate(q.text));
+        const ready = this.enabled && !this.paused && !this.busy && !this.blocked && !this.waitingForSpeech;
+        const key = ready && item ? this.key(item) : null;
+        // Unrelated inbox updates must not postpone an already scheduled question.
+        if (key && key === this.pendingKey) return;
         this.cancel(this.timer);
         this.timer = null;
-        if (!this.enabled || this.paused || this.busy || this.blocked) return;
-        const item = items.find(q => q.channel !== 'mic' && !this.seen.has(this.key(q)) && isAnswerCandidate(q.text));
-        if (!item) return;
+        this.pendingKey = key;
+        if (!key) return;
+        const delay = /(?:[,;:]|(?:^|\s)(?:и|или|если|потому что|and|or|if))\s*$/iu.test(item.text) ? Math.max(4000, this.delay) : this.delay;
         this.timer = this.schedule(async () => {
             this.timer = null;
-            if (!this.enabled || this.paused || this.busy || this.blocked) return;
-            this.seen.add(this.key(item));
+            this.pendingKey = null;
+            if (!this.enabled || this.paused || this.busy || this.blocked || this.waitingForSpeech) return;
+            const current = this.items.find(q => this.key(q) === key);
+            if (!current) return;
+            this.seen.add(key);
             this.busy = true;
             try {
-                await this.send(item);
+                await this.send(current);
             } catch {
                 this.enabled = false;
             } finally {
                 this.busy = false;
                 this.update(this.items);
             }
-        }, this.delay);
+        }, delay);
     }
     close() {
+        this.pendingKey = null;
         this.enabled = false;
         this.cancel(this.timer);
         this.timer = null;
@@ -82,18 +93,28 @@ class QuestionInbox {
         this.gapMs = gapMs;
         this.items = [];
     }
-    add(text, channel = 'system') {
+    add(text, channel = 'system', timing = {}) {
         text = String(text || '').trim();
         if (!text || ACK.test(text)) return;
         const time = this.now();
+        const endAt = Number.isFinite(timing.endAt) ? timing.endAt : time;
+        const startAt = Number.isFinite(timing.startAt) ? timing.startAt : endAt;
+        const segment = { text, startAt, endAt, ...(typeof timing.id === 'string' ? { id: timing.id } : {}) };
+        const continuation =
+            /^(?:и|или|а если|а почему|а как|а что|что если|потому что|например|and|or|what if|and why|for example)(?=\s|[,?:])/iu.test(text);
+
         let item = this.items.at(-1);
         if (
             item &&
             item.channel === channel &&
-            time - item.updatedAt <= this.gapMs &&
+            startAt - (item.endAt ?? item.updatedAt) <= this.gapMs &&
+            startAt >= (item.startAt ?? item.updatedAt) &&
+            (!isAnswerCandidate(text) || continuation) &&
             (!topic(text) || !topic(item.text) || topic(text) === topic(item.text)) &&
             item.text.length + text.length < 12000
         ) {
+            item.segments = [...(item.segments || [{ text: item.text, startAt: item.updatedAt, endAt: item.updatedAt }]), segment];
+            item.endAt = endAt;
             item.text += ' ' + text;
             item.revision++;
             item.updatedAt = time;
@@ -102,9 +123,45 @@ class QuestionInbox {
                 this.emit('update-status', 'Очередь вопросов заполнена. Отправьте или удалите черновики.');
                 return;
             }
-            item = { id: randomUUID(), text, channel, revision: 1, updatedAt: time };
+            item = { id: randomUUID(), text, channel, revision: 1, updatedAt: time, startAt, endAt, segments: [segment] };
             this.items.push(item);
         }
+        this.publish();
+    }
+    split(id, revision, segmentIndex) {
+        const item = this.items.find(q => q.id === id);
+        if (!item || item.revision !== revision) throw Error('Вопрос изменился. Выберите его ещё раз.');
+        if (!Number.isInteger(segmentIndex) || segmentIndex < 1 || segmentIndex >= (item.segments?.length || 0))
+            throw Error('Выберите границу реплик');
+        if (this.items.length >= 30) throw Error('Очередь вопросов заполнена');
+        const parts = [item.segments.slice(0, segmentIndex), item.segments.slice(segmentIndex)];
+        const replacement = parts.map((segments, i) => ({
+            ...item,
+            id: i ? randomUUID() : item.id,
+            revision: item.revision + 1,
+            text: segments.map(s => s.text).join(' '),
+            segments,
+            startAt: segments[0].startAt,
+            endAt: segments.at(-1).endAt,
+        }));
+        this.items.splice(this.items.indexOf(item), 1, ...replacement);
+        this.publish();
+    }
+    merge(id, revision, nextId, nextRevision) {
+        const index = this.items.findIndex(q => q.id === id);
+        const item = this.items[index],
+            next = this.items[index + 1];
+        if (!item || item.revision !== revision || !next || next.id !== nextId || next.revision !== nextRevision)
+            throw Error('Вопросы изменились. Выберите их ещё раз.');
+        if (item.channel !== next.channel || item.text.length + next.text.length + 1 > 12000) throw Error('Нельзя объединить эти вопросы');
+        item.segments = [
+            ...(item.segments || [{ text: item.text, startAt: item.updatedAt, endAt: item.updatedAt }]),
+            ...(next.segments || [{ text: next.text, startAt: next.updatedAt, endAt: next.updatedAt }]),
+        ];
+        item.text += ' ' + next.text;
+        item.revision++;
+        item.endAt = next.endAt ?? next.updatedAt;
+        this.items.splice(index + 1, 1);
         this.publish();
     }
     take(id, revision) {
@@ -117,7 +174,7 @@ class QuestionInbox {
     publish() {
         this.emit(
             'question-inbox',
-            this.items.map(item => ({ ...item }))
+            this.items.map(item => ({ ...item, segments: item.segments?.map(segment => ({ ...segment })) }))
         );
     }
     clear() {
@@ -160,7 +217,7 @@ function responseInstructions(mode = 'answer') {
         );
     return (
         base +
-        '\nUse exactly these Markdown headings, each on its own line: ## Сказать сейчас; ## Объяснить; ## Углубиться. Do not append translations, parentheses, descriptions or English labels to headings. Under the first heading write 2–3 spoken sentences, under the second a clear explanation, under the third optional technical details. When asked for code or an example, include the complete code/example under the first heading after the short introduction, never exclusively under the deeper sections. These output requirements override conflicting length/format requirements in the selected profile.'
+        '\nUse exactly these Markdown headings, each on its own line: ## Сказать сейчас; ## Объяснить; ## Углубиться. Do not append translations, parentheses, descriptions or English labels to headings. Under the first heading write 2–3 spoken sentences, under the second at most three key points, under the third optional technical details. Put requested examples immediately under the first heading, never exclusively under deeper sections. For comparisons use a compact Markdown table (at most four rows). For SQL show tiny input and result tables. For processes use a short text flow with arrows; for algorithms include a concrete input/output example and complexity. For behavioral questions use Situation, Task, Action, Result based only on verified materials; mark missing facts. Do not add a visual if it does not clarify the question. These output requirements override conflicting length/format requirements in the selected profile.'
     );
 }
 function validateRequest(input) {
@@ -180,4 +237,4 @@ function validateRequest(input) {
     if (input.imageMode && !['ocr', 'vision'].includes(input.imageMode)) throw new Error('Invalid image mode');
     return input;
 }
-module.exports = { QuestionInbox, AutoAnswerQueue, isAnswerCandidate, isFollowup, topic, relevantMaterials, responseInstructions, validateRequest };
+module.exports = { AutoAnswerQueue, isAnswerCandidate, QuestionInbox, isFollowup, topic, relevantMaterials, responseInstructions, validateRequest };

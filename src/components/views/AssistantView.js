@@ -315,6 +315,17 @@ export class AssistantView extends LitElement {
             border-color: var(--success);
         }
 
+        .answer-example {
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin: 12px 0;
+        }
+        .answer-example > p:first-child {
+            font-weight: 600;
+            margin: 0 0 8px;
+        }
         /* ── Live transcript ── */
 
         .transcript {
@@ -753,6 +764,18 @@ export class AssistantView extends LitElement {
                 node = next;
             }
             heading.remove();
+            // Tables and code are reference material: they should not disappear inside optional prose.
+            const examples = [...details.querySelectorAll('table, pre')];
+            if (examples.length) {
+                const card = doc.createElement('section');
+                card.className = 'answer-example';
+                card.setAttribute('aria-label', 'Наглядный пример');
+                const label = doc.createElement('p');
+                label.textContent = 'Наглядный пример';
+                card.appendChild(label);
+                examples.forEach(example => card.appendChild(example));
+                details.before(card);
+            }
         }
         const tagsToSkip = ['PRE'];
 
@@ -1359,6 +1382,7 @@ export class AssistantView extends LitElement {
             ${
                 this.hostedMode
                     ? html`<interview-tools
+                          .paused=${this.paused}
                           style=${this.focusMode ? 'display:none' : ''}
                           @font-step=${e => this.changeFontSize(e.detail)}
                           @focus-toggle=${() => {

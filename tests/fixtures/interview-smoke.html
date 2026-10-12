@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+    <meta charset="utf-8" />
+    <title>Interview UI smoke</title>
+    <body>
+        <script type="module">
+            const nodeRequire = window.require;
+            const { ipcRenderer } = nodeRequire('electron');
+            const assert = nodeRequire('node:assert/strict');
+            const { QuestionInbox } = nodeRequire('../../src/utils/interview-workflow');
+            const listeners = new Map();
+            let recording = false;
+            const owner = { topicMeta: [], responses: [], _inlineRequests: new Map() };
+            const inbox = new QuestionInbox((event, data) => listeners.get(event)?.(null, data));
+            const ipc = {
+                on: (name, fn) => listeners.set(name, fn),
+                removeListener: name => listeners.delete(name),
+                invoke: async (name, value) => {
+                    if (name === 'interview:workspace-load') return { success: true, data: { packages: [] } };
+                    if (name === 'interview:questions') return { success: true, data: inbox.items };
+                    if (name === 'interview:record-transcript') {
+                        recording = value.enabled;
+                        return { success: true, enabled: recording };
+                    }
+                    if (name === 'interview:merge-questions') inbox.merge(value.id, value.revision, value.nextId, value.nextRevision);
+                    if (name === 'interview:split-question') inbox.split(value.id, value.revision, value.segmentIndex);
+                    return { success: true };
+                },
+            };
+            window.require = name =>
+                name === 'electron'
+                    ? { ipcRenderer: ipc }
+                    : name === './utils/interview-workflow'
+                      ? nodeRequire('../../src/utils/interview-workflow')
+                      : nodeRequire(name);
+            window.cheatingDaddy = { element: () => owner };
+            try {
+                const { AssistantView } = await import('../../src/components/views/AssistantView.js');
+                const { InterviewTools } = await import('../../src/components/views/InterviewTools.js');
+                const view = new AssistantView();
+                const output = view.wrapWordsInSpans(
+                    '<p>Короткий ответ</p><h2>Углубиться</h2><p>Детали</p><table><tr><td>LEFT JOIN</td></tr></table><pre><code>select 1;</code></pre>'
+                );
+                const result = new DOMParser().parseFromString(output, 'text/html');
+                assert.ok(result.querySelector('.answer-example table'));
+                assert.ok(result.querySelector('.answer-example pre'));
+                assert.equal(result.querySelectorAll('details table, details pre').length, 0);
+                assert.equal(result.querySelector('details').open, false);
+                const tools = new InterviewTools();
+                document.body.append(tools);
+                await tools.updateComplete;
+                await new Promise(r => setTimeout(r, 0));
+                await tools.updateComplete;
+                const findButton = text => [...tools.shadowRoot.querySelectorAll('button')].find(b => b.textContent.includes(text));
+                assert.equal(tools.autoAnswers, false);
+                tools.tab = 'questions';
+                tools.collapsed = false;
+                assert.equal(recording, false);
+                tools.shadowRoot.querySelector('input[type=checkbox]').click();
+                await new Promise(r => setTimeout(r, 0));
+                assert.equal(recording, true);
+                inbox.add('В чем разница между процессом и потоком');
+                inbox.add('Какие ваши зарплатные ожидания?');
+                await tools.updateComplete;
+                findButton('Объединить со следующим').click();
+                await new Promise(r => setTimeout(r, 0));
+                await tools.updateComplete;
+                assert.equal(inbox.items.length, 1);
+                findButton('Разделить').click();
+                await new Promise(r => setTimeout(r, 0));
+                await tools.updateComplete;
+                assert.equal(inbox.items.length, 2);
+                const input = tools.shadowRoot.querySelector('textarea');
+                input.value = 'Мой исправленный вопрос';
+                input.dispatchEvent(new Event('input'));
+                await tools.updateComplete;
+                assert.ok(findButton('Объединить со следующим').disabled);
+                tools.autoQueue.delay = 1;
+                const sent = [];
+                tools.ask = async text => sent.push(text);
+                tools.toggleAutoAnswers();
+                inbox.add('Напишите функцию поиска');
+                listeners.get('audio-progress')(null, { speaking: true, pending: 0 });
+                await new Promise(r => setTimeout(r, 15));
+                assert.equal(sent.length, 0);
+                listeners.get('audio-progress')(null, { speaking: false, pending: 0 });
+                await new Promise(r => setTimeout(r, 25));
+                assert.deepEqual(sent, ['Напишите функцию поиска']);
+                tools.remove();
+                assert.equal(listeners.size, 0);
+                ipcRenderer.send('interview-smoke-result', {
+                    success: true,
+                    checks: [
+                        'visible table/code',
+                        'recording opt-in',
+                        'merge/split controls',
+                        'edited draft protection',
+                        'speech gating',
+                        'automatic answer',
+                        'listener cleanup',
+                    ],
+                });
+            } catch (error) {
+                ipcRenderer.send('interview-smoke-result', { success: false, error: error.stack });
+            }
+        </script>
+    </body>
+</html>

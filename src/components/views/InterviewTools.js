@@ -19,6 +19,10 @@ export class InterviewTools extends LitElement {
         busy: { state: true },
         autoAnswers: { state: true },
         paused: { type: Boolean },
+        audioProgress: { state: true },
+        audioError: { state: true },
+        recordTranscript: { state: true },
+        splitSegment: { state: true },
         workspace: { state: true },
         mode: { state: true },
         routing: { state: true },
@@ -359,6 +363,11 @@ export class InterviewTools extends LitElement {
     updated(changed) {
         if (!this.preparationOnly && ['tab', 'collapsed', 'inbox', 'routing', 'mode', 'autoAnswers'].some(key => changed.has(key)))
             this.dispatchEvent(new CustomEvent('session-toolbar-change', { bubbles: true, composed: true }));
+        if (this.autoQueue && (changed.has('paused') || changed.has('busy'))) {
+            this.autoQueue.paused = this.paused;
+            this.autoQueue.blocked = this.busy;
+            this.autoQueue.update(this.inbox);
+        }
         this.toggleAttribute('design-active', !this.preparationOnly && this.tab === 'design' && !this.collapsed);
         if (changed.has('libraryTab'))
             this.libraryId = this.workspace[this.libraryTab === 'resumes' ? 'activeResumeId' : 'activeVacancyId'] || this.libraryItems[0]?.id || '';
@@ -383,6 +392,10 @@ export class InterviewTools extends LitElement {
         this.busy = false;
         this.autoAnswers = false;
         this.paused = false;
+        this.audioProgress = { speaking: false, pending: 0 };
+        this.audioError = '';
+        this.recordTranscript = false;
+        this.splitSegment = 1;
         this.manualDraftIds = new Set();
         this.workspace = {
             version: 2,
@@ -461,12 +474,33 @@ export class InterviewTools extends LitElement {
         };
         this.addEventListener('paste', this.onPaste);
         this.ipc.on('question-inbox', this.onInbox);
+        this.onAudio = (_, progress) => {
+            this.audioProgress = progress;
+            this.autoQueue.waitingForSpeech = progress.speaking || progress.pending > 0;
+            this.autoQueue.update(this.inbox);
+        };
+        this.onAudioError = (_, message) => {
+            this.audioError = message;
+            this.autoAnswers = false;
+            this.autoQueue.setEnabled(false);
+            this.notifyAutoAnswers();
+        };
+        this.onRecording = (_, value) => {
+            this.recordTranscript = value.enabled;
+            if (value.error) this.audioError = value.error;
+        };
+        this.ipc.on('audio-progress', this.onAudio);
+        this.ipc.on('audio-error', this.onAudioError);
+        this.ipc.on('transcript-recording', this.onRecording);
         this.load();
     }
     disconnectedCallback() {
         super.disconnectedCallback();
         this.autoQueue?.close();
         this.ipc.removeListener('question-inbox', this.onInbox);
+        this.ipc.removeListener('audio-progress', this.onAudio);
+        this.ipc.removeListener('audio-error', this.onAudioError);
+        this.ipc.removeListener('transcript-recording', this.onRecording);
         this.removeEventListener('paste', this.onPaste);
     }
     async load() {
@@ -491,6 +525,10 @@ export class InterviewTools extends LitElement {
     async perform(fn) {
         if (this.busy) return;
         this.busy = true;
+        if (this.autoQueue) {
+            this.autoQueue.blocked = true;
+            this.autoQueue.update(this.inbox);
+        }
         this.status = 'Выполняется…';
         try {
             await fn();
@@ -500,6 +538,10 @@ export class InterviewTools extends LitElement {
             return false;
         } finally {
             this.busy = false;
+            if (this.autoQueue) {
+                this.autoQueue.blocked = false;
+                this.autoQueue.update(this.inbox);
+            }
         }
     }
     async persist() {
@@ -532,16 +574,52 @@ export class InterviewTools extends LitElement {
             this.status = 'Удалено';
         });
     }
+    get listeningHint() {
+        if (this.audioError) return this.audioError;
+        if (this.paused) return 'Аудио на паузе. Можно ответить вручную.';
+        if (this.audioProgress.speaking) return 'Слышу собеседника — жду конец вопроса';
+        if (this.audioProgress.pending) return `Распознаю речь · в очереди ${this.audioProgress.pending}`;
+        if (!this.autoAnswers) return 'Выберите вопрос и нажмите «Ответить сейчас»';
+        if (this.busy) return 'Готовлю ответ. Запись речи продолжается.';
+        return 'Автоответ после завершения вопроса. Неоднозначные реплики отправьте вручную.';
+    }
+    async toggleTranscript() {
+        try {
+            this.recordTranscript = (await this.call('record-transcript', { enabled: !this.recordTranscript })).enabled;
+        } catch (error) {
+            this.status = error.message;
+        }
+    }
+    async editQuestionGroup(action) {
+        this.autoAnswers = false;
+        this.autoQueue.setEnabled(false);
+        this.notifyAutoAnswers();
+        const selected = this.inbox.find(q => q.id === this.questionId);
+        const next = this.inbox[this.inbox.indexOf(selected) + 1];
+        const success = await this.perform(() =>
+            this.call(action, {
+                id: this.questionId,
+                revision: this.revision,
+                segmentIndex: Number(this.splitSegment),
+                nextId: next?.id,
+                nextRevision: next?.revision,
+            })
+        );
+        if (success) this.status = 'Проверьте вопросы после изменения. Автоответы выключены.';
+    }
     selectQuestion(q) {
         this.questionId = q.id;
         this.questionText = q.text;
         this.revision = q.revision;
+        this.splitSegment = 1;
     }
     notifyAutoAnswers() {
         this.dispatchEvent(new CustomEvent('auto-answers-change', { detail: this.autoAnswers, bubbles: true, composed: true }));
     }
     toggleAutoAnswers() {
         this.autoAnswers = !this.autoAnswers;
+        if (this.autoAnswers) this.audioError = '';
+        this.autoQueue.paused = this.paused;
         this.autoQueue.setEnabled(this.autoAnswers);
         this.status = '';
         this.notifyAutoAnswers();
@@ -995,46 +1073,90 @@ export class InterviewTools extends LitElement {
         const splitOptions =
             selectedTopics.length === 1 ? [...(owner._inlineRequests?.entries() || [])].filter(([, r]) => r.index === selectedTopics[0]) : [];
         return html` ${
+            !this.preparationOnly
+                ? html`<div class="bar">
+                      <label title="Только текст с момента включения. Хранится локально до удаления сессии.">
+                          <input type="checkbox" .checked=${this.recordTranscript} @change=${() => this.toggleTranscript()} /> Сохранять расшифровку
+                      </label>
+                  </div>`
+                : ''
+        }
+        ${
+            !this.preparationOnly
+                ? html`<div class="bar" role="status">
+                      ${this.listeningHint}${
+                          this.audioError
+                              ? html`<button
+                                    @click=${() => {
+                                        this.audioError = '';
+                                    }}
+                                >
+                                    Понятно
+                                </button>`
+                              : ''
+                      }
+                  </div>`
+                : ''
+        }
+        ${
             (!this.collapsed && this.tab && (this.tab !== 'questions' || selected)) || this.preparationOnly
                 ? html`<div class="panel">
                       ${this.preparationOnly || this.tab === 'prep' ? this.renderPreparation() : ''}
                       ${
                           !this.preparationOnly && this.tab === 'questions'
-                              ? html`
-                                    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">
-                                        ${this.inbox.map((q, i) => html`<button style="flex-shrink:0;max-width:260px;text-align:left" title=${q.text} class=${q.id === this.questionId ? 'active' : ''} @click=${() => this.selectQuestion(q)}>${i + 1}. ${q.text.slice(0, 85)}${q.text.length > 85 ? '…' : ''}</button>`)}
-                                    </div>
-                                    ${
-                                        selected
-                                            ? html`<textarea
-                                                      aria-label="Реплика собеседника"
-                                                      id="heard-question"
-                                                      .value=${this.questionText}
-                                                      @input=${e => {
-                                                          this.questionText = e.target.value;
-                                                          this.manualDraftIds.add(this.questionId);
-                                                      }}
-                                                  ></textarea
-                                                  >${selected.revision !== this.revision ? html`<button @click=${() => this.selectQuestion(selected)}>Обновить реплику</button>` : ''}<button
-                                                      ?disabled=${this.busy || selected.revision !== this.revision}
-                                                      @click=${this.sendQuestion}
+                              ? html`${this.inbox.map(q => html`<button class=${q.id === this.questionId ? 'active' : ''} @click=${() => this.selectQuestion(q)}>${q.text.slice(0, 85)}</button>`)}${
+                                    selected
+                                        ? html`<div class="bar">
+                                                  <button
+                                                      ?disabled=${this.busy || this.questionText !== selected.text || selected.revision !== this.revision || this.inbox.indexOf(selected) === this.inbox.length - 1}
+                                                      @click=${() => this.editQuestionGroup('merge-questions')}
                                                   >
-                                                      Ответить</button
-                                                  ><button
-                                                      ?disabled=${this.busy}
-                                                      @click=${() =>
-                                                          this.perform(async () => {
-                                                              await this.call('discard-question', { id: selected.id, revision: selected.revision });
-                                                              this.questionId = '';
-                                                              this.questionText = '';
-                                                              this.status = 'Вопрос удалён';
-                                                          })}
-                                                  >
-                                                      Удалить
-                                                  </button>`
-                                            : ''
-                                    }
-                                `
+                                                      Объединить со следующим
+                                                  </button>
+                                                  ${
+                                                      (selected?.segments?.length || 0) > 1
+                                                          ? html` <select
+                                                                    aria-label="Разделить перед репликой"
+                                                                    .value=${String(this.splitSegment)}
+                                                                    @change=${e => (this.splitSegment = Number(e.target.value))}
+                                                                >
+                                                                    ${selected.segments.slice(1).map((segment, i) => html`<option value=${i + 1}>${segment.text.slice(0, 80)}</option>`)}
+                                                                </select>
+                                                                <button
+                                                                    ?disabled=${this.busy || this.questionText !== selected.text || selected.revision !== this.revision}
+                                                                    @click=${() => this.editQuestionGroup('split-question')}
+                                                                >
+                                                                    Разделить
+                                                                </button>`
+                                                          : ''
+                                                  }
+                                              </div>
+                                              <textarea
+                                                  .value=${this.questionText}
+                                                  @input=${e => {
+                                                      this.questionText = e.target.value;
+                                                      if (this.questionId) this.manualDraftIds.add(this.questionId);
+                                                  }}
+                                              ></textarea
+                                              >${selected.revision !== this.revision ? html`<button @click=${() => this.selectQuestion(selected)}>Получено дополнение — загрузить новую версию</button>` : ''}<button
+                                                  ?disabled=${this.busy || selected.revision !== this.revision}
+                                                  @click=${this.sendQuestion}
+                                              >
+                                                  Ответить сейчас</button
+                                              ><button
+                                                  ?disabled=${this.busy}
+                                                  @click=${() =>
+                                                      this.perform(async () => {
+                                                          await this.call('discard-question', { id: selected.id, revision: selected.revision });
+                                                          this.questionId = '';
+                                                          this.questionText = '';
+                                                          this.status = 'Вопрос удалён';
+                                                      })}
+                                              >
+                                                  Пропустить
+                                              </button>`
+                                        : ''
+                                } `
                               : ''
                       }
                       ${

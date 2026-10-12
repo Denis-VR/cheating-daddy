@@ -543,6 +543,23 @@ export class HistoryView extends LitElement {
                             </ul>
                             ${!this.review?.[key]?.length ? html`<p>Недостаточно данных для вывода.</p>` : ''}`
                 )}`;
+        if (this.activeTab === 'transcript') {
+            const transcript = this.selectedSession.transcript || [];
+            return html`<p>Текст с момента включения сохранения. Аудиозапись не хранится. Удаляется вместе с сессией.</p>
+                ${this.selectedSession.transcriptError ? html`<p role="alert">${this.selectedSession.transcriptError}</p>` : ''}
+                ${!transcript.length ? html`<p>Расшифровка не сохранена. Включите её сохранение во время следующей сессии.</p>` : ''}
+                ${transcript.map(
+                    line =>
+                        html`<div class="message-row user">
+                            <div class="message">
+                                <div class="message-meta">
+                                    ${line.channel === 'mic' ? 'Микрофон' : 'Собеседник (системный звук)'} · ${this.formatTime(line.at)}
+                                </div>
+                                <div class="message-body">${line.text}</div>
+                            </div>
+                        </div>`
+                )}`;
+        }
         if (this.activeTab === 'conversation') {
             const messages = this.collectConversation(this.selectedSession);
             if (!messages.length) return html`<div class="empty">В сессии нет сообщений.</div>`;
@@ -682,6 +699,14 @@ export class HistoryView extends LitElement {
                 >
             </div>
             <div class="tab-row">
+                <button
+                    class="tab-btn ${this.activeTab === 'transcript' ? 'active' : ''}"
+                    @click=${() => {
+                        this.activeTab = 'transcript';
+                    }}
+                >
+                    Расшифровка (${this.selectedSession.transcript?.length || 0})
+                </button>
                 <button
                     class="tab-btn ${this.activeTab === 'review' ? 'active' : ''}"
                     @click=${() => {

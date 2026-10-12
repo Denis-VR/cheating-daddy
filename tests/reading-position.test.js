@@ -567,7 +567,7 @@ test('quick action edits persist full prompts, preserve old actions on failure, 
     assert.equal(view.quickActions.length, 0);
 });
 
-test('explanation and deeper sections stay collapsed even with code and accept bold-style labels', () => {
+test('optional prose stays collapsed while code stays visible, including bold-style labels', () => {
     for (const tag of ['H1', 'H2', 'H3', 'P']) {
         const root = [];
         function element(tagName, textContent = '') {
@@ -589,6 +589,10 @@ test('explanation and deeper sections stay collapsed even with code and accept b
                     const index = root.indexOf(node);
                     if (index >= 0) root.splice(index, 1);
                     this.children.push(node);
+                },
+                setAttribute() {},
+                querySelectorAll() {
+                    return this.children.filter(n => ['PRE', 'TABLE'].includes(n.tagName));
                 },
                 querySelector(selector) {
                     return selector === 'pre' && this.children.find(n => n.tagName === 'PRE');
@@ -614,13 +618,13 @@ test('explanation and deeper sections stay collapsed even with code and accept b
             },
         });
         Object.create(View.prototype).wrapWordsInSpans('');
-        assert.equal(root.length, 2);
-        assert.equal(root[0].open, false);
+        assert.equal(root.length, 3);
         assert.equal(root[1].open, false);
+        assert.equal(root[2].open, false);
         assert.equal(root[0].children[1], code);
-        assert.equal(root[1].children[1], paragraph);
-        assert.equal(root[0].children[0].textContent, 'Объяснить');
-        assert.equal(root[1].children[0].textContent, 'Углубиться');
+        assert.equal(root[2].children[1], paragraph);
+        assert.equal(root[1].children[0].textContent, 'Объяснить');
+        assert.equal(root[2].children[0].textContent, 'Углубиться');
     }
 });
 
