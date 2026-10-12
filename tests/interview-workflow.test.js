@@ -127,3 +127,9 @@ test('table mode asks for a compact cheat-sheet table instead of the three spoke
     assert.match(instructions, /Markdown table/);
     assert.ok(!instructions.includes('Сказать сейчас'));
 });
+test('the base answer stays short; explanation and depth are separate on-demand modes', () => {
+    assert.ok(!/Объяснить|Углубиться/.test(responseInstructions('answer')));
+    assert.match(responseInstructions('explain'), /plain words/);
+    assert.match(responseInstructions('deep'), /follow-up questions/);
+    for (const mode of ['explain', 'deep']) assert.equal(validateRequest({ text: 'x', requestId: 'id', mode }).mode, mode);
+});

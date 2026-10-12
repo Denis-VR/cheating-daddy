@@ -220,15 +220,25 @@ function responseInstructions(mode = 'answer') {
             base +
             '\nReturn ONLY a JSON object with string fields requirements, load, api, storage, components, decisions, changes. components must be a simple Mermaid flowchart TD with nodes and arrows (no HTML, links, click handlers or styling). Preserve previous decisions unless the new requirement changes them. changes explains exactly what changed and why. Do not erase unknown fields by guessing. No markdown fences around JSON.'
         );
+    if (mode === 'explain')
+        return (
+            base +
+            '\nExplain the answer the user is reading in plain words, as to a smart colleague outside the topic: the core idea and why it works, at most three short bullets, plus one everyday analogy if it really helps. No headings, no introduction, no repetition of the original answer. These output requirements override conflicting length/format requirements in the selected profile.'
+        );
+    if (mode === 'deep')
+        return (
+            base +
+            '\nGo one level deeper than the answer the user is reading: internals, trade-offs, edge cases and limits, and two likely follow-up questions from the interviewer with one-line answers. At most eight short bullets; a tiny code or table only if it is essential. No headings, no introduction, no repetition of the original answer. These output requirements override conflicting length/format requirements in the selected profile.'
+        );
     return (
         base +
-        '\nUse exactly these Markdown headings, each on its own line: ## Сказать сейчас; ## Объяснить; ## Углубиться. Do not append translations, parentheses, descriptions or English labels to headings. Under the first heading write 2–3 spoken sentences, under the second at most three key points, under the third optional technical details. Put requested examples immediately under the first heading, never exclusively under deeper sections. For comparisons use a compact Markdown table (at most four rows). For SQL show tiny input and result tables. For processes use a short text flow with arrows; for algorithms include a concrete input/output example and complexity. For behavioral questions use Situation, Task, Action, Result based only on verified materials; mark missing facts. Do not add a visual if it does not clarify the question. These output requirements override conflicting length/format requirements in the selected profile.'
+        '\nGive only what the candidate can say right now: 2–3 short spoken sentences, no headings and no introduction. Do not add explanation or deep-dive sections; the user asks for those separately. Put requested examples right after the sentences. For comparisons add a compact Markdown table (at most four rows). For SQL show tiny input and result tables. For processes use a short text flow with arrows; for algorithms include a concrete input/output example and complexity. For behavioral questions use Situation, Task, Action, Result based only on verified materials; mark missing facts. Do not add a visual if it does not clarify the question. These output requirements override conflicting length/format requirements in the selected profile.'
     );
 }
 function validateRequest(input) {
     if (!input || typeof input.text !== 'string' || !input.text.trim() || input.text.length > 30000)
         throw new Error('Введите запрос до 30000 символов');
-    if (!['answer', 'technical', 'design', 'table'].includes(input.mode || 'answer')) throw new Error('Неизвестный режим');
+    if (!['answer', 'technical', 'design', 'table', 'explain', 'deep'].includes(input.mode || 'answer')) throw new Error('Неизвестный режим');
     if (input.context !== undefined && (typeof input.context !== 'string' || input.context.length > 30000))
         throw new Error('Слишком большой контекст');
     if (typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(input.requestId)) throw new Error('Invalid request ID');

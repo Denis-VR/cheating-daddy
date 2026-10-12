@@ -18,8 +18,13 @@ const DEFAULT_QUICK_ACTIONS = [
     },
 ];
 
-const INLINE_QUICK_ACTIONS = 3;
-const TABLE_ACTION = { label: 'Таблица', prompt: 'Сведи этот ответ в таблицу-шпаргалку' };
+const INLINE_QUICK_ACTIONS = 2;
+// Built-in follow-ups that use their own answer modes; the base answer stays short and these load only on demand.
+const ANSWER_VIEWS = [
+    { label: '▦ Таблица', prompt: 'Сведи этот ответ в таблицу-шпаргалку', mode: 'table', title: 'Ответ таблицей-шпаргалкой' },
+    { label: 'Объяснить', prompt: 'Объясни этот ответ простыми словами', mode: 'explain', title: 'Суть и почему это так, простыми словами' },
+    { label: 'Детали', prompt: 'Углубись в детали этого ответа', mode: 'deep', title: 'Внутреннее устройство, нюансы и вероятные доп. вопросы' },
+];
 
 const TELEPROMPTER_SPEED = { min: 10, max: 200, step: 10 };
 
@@ -1378,14 +1383,17 @@ export class AssistantView extends LitElement {
             </button>`;
         const shown = this.actionsExpanded ? this.quickActions : this.quickActions.slice(0, INLINE_QUICK_ACTIONS);
         return html`<div class="quick-followups ${this.actionsExpanded ? 'expanded' : ''}" role="group" aria-label="Уточнить ответ">
-            <button
-                class="analyze-btn primary"
-                title="Показать ответ таблицей-шпаргалкой"
-                ?disabled=${disabled}
-                @click=${() => this.handleQuickFollowup(TABLE_ACTION.prompt, { mode: 'table' })}
-            >
-                ▦ ${TABLE_ACTION.label}
-            </button>
+            ${ANSWER_VIEWS.map(
+                view =>
+                    html`<button
+                        class="analyze-btn primary"
+                        title=${view.title}
+                        ?disabled=${disabled}
+                        @click=${() => this.handleQuickFollowup(view.prompt, { mode: view.mode })}
+                    >
+                        ${view.label}
+                    </button>`
+            )}
             ${shown.map(button)}
             ${this.actionsExpanded
                 ? html`<button

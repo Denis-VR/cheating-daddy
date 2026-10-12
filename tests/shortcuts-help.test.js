@@ -142,8 +142,10 @@ test('answer strip keeps the table button and copy in view, rare actions behind 
     assert.match(flatten(view.render()), /class="tp-speed"/);
     view.quickActions = ['A', 'B', 'C', 'D'].map(label => ({ label, prompt: label }));
     const collapsed = flatten(view.render());
-    assert.match(collapsed, /C\s*<\/button>/);
-    assert.ok(!/D\s*<\/button>/.test(collapsed));
+    assert.match(collapsed, /B\s*<\/button>/);
+    assert.ok(!/C\s*<\/button>/.test(collapsed));
+    assert.match(collapsed, /Объяснить/);
+    assert.match(collapsed, /Детали/);
     view.actionsExpanded = true;
     assert.match(flatten(view.render()), /D\s*<\/button>/);
     assert.deepEqual(view.responses, ['saved answer']);
