@@ -1255,6 +1255,14 @@ export class CheatingDaddyApp extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
 
+        if (changedProperties.has('currentView') && this.currentView === 'assistant')
+            window.cheatingDaddy?.storage
+                ?.getKeybinds()
+                .then(keybinds => {
+                    this._hideKey = keybinds?.toggleVisibility || '';
+                    this.requestUpdate();
+                })
+                .catch(console.error);
         if (changedProperties.has('currentView') && window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.send('view-changed', this.currentView);
@@ -1504,7 +1512,9 @@ export class CheatingDaddyApp extends LitElement {
                     >
                         ${this._isPaused ? '▶' : '❚❚'}
                     </button>
-                    <button class="live-chip" title="Скрыть окно" @click=${() => this.handleHideToggle()}>Скрыть</button>
+                    <span class="live-bar-text" title="Скрыть окно и вернуть его повторным нажатием"
+                        >Скрыть: ${this._hideKey || `${window.cheatingDaddy.modKey}+\\`}</span
+                    >
                 </div>
             </div>
         `;

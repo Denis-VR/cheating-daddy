@@ -64,7 +64,8 @@ test('shortcut sheet is protected before display, isolated and independent of ma
     assert.equal(blocked, true);
     const html = decodeURIComponent(win.url.split(',').slice(1).join(','));
     assert.match(html, /Cmd\+K/);
-    assert.match(html, /ScreenCaptureKit/);
+    assert.ok(!html.includes('ScreenCaptureKit'));
+    assert.ok(!html.includes('<h1>'));
 });
 
 test('repeat shortcut and Escape close sheet; parent hiding closes it and removes listeners', () => {

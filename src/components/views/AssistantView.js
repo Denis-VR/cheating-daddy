@@ -560,7 +560,7 @@ export class AssistantView extends LitElement {
             display: flex;
             align-items: center;
             gap: var(--space-sm);
-            padding: var(--space-md);
+            padding: 2px var(--space-sm) var(--space-sm);
             background: var(--bg-app);
         }
 
