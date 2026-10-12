@@ -172,62 +172,72 @@ export class AICustomizeView extends LitElement {
         const active = this._tab === 'profiles' ? this.selectedProfile : this._activeId;
         return html`<div class="unified-page">
             <div class="unified-wrap">
-                <div class="page-title">AI Customization</div>
+                <div class="page-title">Настройки AI</div>
                 <div class="tabs">
                     <button class=${this._tab === 'profiles' ? 'primary' : ''} @click=${() => this._switch('profiles')}>Профили</button>
                     <button class=${this._tab === 'instructions' ? 'primary' : ''} @click=${() => this._switch('instructions')}>
                         Дополнительные инструкции
                     </button>
+                    <button class=${this._tab === 'resumes' ? 'primary' : ''} @click=${() => this._switch('resumes')}>Резюме</button>
+                    <button class=${this._tab === 'vacancies' ? 'primary' : ''} @click=${() => this._switch('vacancies')}>Вакансии</button>
                 </div>
-                <section class="surface editor-layout">
-                    <div class="list">
-                        <button @click=${this._create} ?disabled=${!this._loaded || this._saving}>
-                            + ${this._tab === 'profiles' ? 'Новый профиль' : 'Новый набор'}
-                        </button>
-                        ${this._items.map(
-                            item =>
-                                html`<button
-                                    class=${item.id === this._selectedId ? 'selected' : ''}
-                                    @click=${() => {
-                                        this._selectedId = item.id;
-                                    }}
-                                >
-                                    ${item.name}${item.id === active ? ' ✓' : ''}
-                                </button>`
-                        )}
-                    </div>
-                    <div class="editor">
-                        ${
-                            current
-                                ? html`
-                                      <label for="editor-name">Название</label>
-                                      <input
-                                          id="editor-name"
-                                          class="control"
-                                          maxlength="100"
-                                          .value=${current.name}
-                                          @input=${e => this._edit('name', e.target.value)}
-                                      />
-                                      <label for="editor-text"
-                                          >${this._tab === 'profiles' ? 'Полный текст профиля' : 'Дополнительные инструкции'}</label
-                                      >
-                                      <textarea
-                                          id="editor-text"
-                                          class="control"
-                                          maxlength="30000"
-                                          .value=${current.text}
-                                          @input=${e => this._edit('text', e.target.value)}
-                                      ></textarea>
-                                      <div class="actions"><button @click=${this._delete} ?disabled=${this._saving}>Удалить выбранный</button></div>
-                                  `
-                                : html`<p>Профилей нет. Можно создать новый или сохранить режим без профиля.</p>`
-                        }
-                        <div class="actions">
-                            <button class="primary" @click=${this._save} ?disabled=${!this._loaded || this._saving}>Сохранить и использовать</button>
-                        </div>
-                        <div role="status">${this._status}</div>
-                    </div>
-                </section>
+                ${
+                    ['resumes', 'vacancies'].includes(this._tab)
+                        ? html`<interview-tools .preparationOnly=${true} .libraryTab=${this._tab}></interview-tools>`
+                        : html`<section class="surface editor-layout">
+                              <div class="list">
+                                  <button @click=${this._create} ?disabled=${!this._loaded || this._saving}>
+                                      + ${this._tab === 'profiles' ? 'Новый профиль' : 'Новый набор'}
+                                  </button>
+                                  ${this._items.map(
+                                      item =>
+                                          html`<button
+                                              class=${item.id === this._selectedId ? 'selected' : ''}
+                                              @click=${() => {
+                                                  this._selectedId = item.id;
+                                              }}
+                                          >
+                                              ${item.name}${item.id === active ? ' ✓' : ''}
+                                          </button>`
+                                  )}
+                              </div>
+                              <div class="editor">
+                                  ${
+                                      current
+                                          ? html`
+                                                <label for="editor-name">Название</label>
+                                                <input
+                                                    id="editor-name"
+                                                    class="control"
+                                                    maxlength="100"
+                                                    .value=${current.name}
+                                                    @input=${e => this._edit('name', e.target.value)}
+                                                />
+                                                <label for="editor-text"
+                                                    >${this._tab === 'profiles' ? 'Полный текст профиля' : 'Дополнительные инструкции'}</label
+                                                >
+                                                <textarea
+                                                    id="editor-text"
+                                                    class="control"
+                                                    maxlength="30000"
+                                                    .value=${current.text}
+                                                    @input=${e => this._edit('text', e.target.value)}
+                                                ></textarea>
+                                                <div class="actions">
+                                                    <button @click=${this._delete} ?disabled=${this._saving}>Удалить выбранный</button>
+                                                </div>
+                                            `
+                                          : html`<p>Профилей нет. Можно создать новый или сохранить режим без профиля.</p>`
+                                  }
+                                  <div class="actions">
+                                      <button class="primary" @click=${this._save} ?disabled=${!this._loaded || this._saving}>
+                                          Сохранить и использовать
+                                      </button>
+                                  </div>
+                                  <div role="status">${this._status}</div>
+                              </div>
+                          </section>`
+                }
             </div>
         </div>`;
     }

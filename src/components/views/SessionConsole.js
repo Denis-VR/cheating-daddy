@@ -4,8 +4,8 @@ export class SessionConsole extends LitElement {
     static styles = css`
         :host {
             display: block;
-            padding: 12px 20px;
-            background: var(--bg-app, #111);
+            padding: 0;
+            background: transparent;
             color: var(--text-primary, #eee);
             font: 14px/1.6 var(--font, sans-serif);
             overflow-wrap: anywhere;
@@ -37,6 +37,11 @@ export class SessionConsole extends LitElement {
             white-space: normal;
             justify-self: start;
             -webkit-app-region: no-drag;
+        }
+        .primary {
+            background: var(--accent, #eee);
+            color: #111;
+            font-weight: 600;
         }
         button:disabled {
             opacity: 0.5;
@@ -141,10 +146,12 @@ export class SessionConsole extends LitElement {
         const ipc = window.require('electron').ipcRenderer;
         try {
             const prefs = await window.cheatingDaddy.storage.getPreferences();
+            const config = (await window.cheatingDaddy.storage.getConfig?.()) || {};
+            const textOnly = ['claude-code', 'codex'].includes(prefs.providerMode) && config.bridgeMediaProvider === 'none';
             const [api, screen, mic] = await Promise.all([
                 ipc.invoke('session:preflight', prefs.providerMode),
-                ipc.invoke('capture-screen-draft'),
-                ['mic_only', 'both'].includes(prefs.audioMode) ? this.microphone() : Promise.resolve(null),
+                textOnly ? Promise.resolve(null) : ipc.invoke('capture-screen-draft'),
+                !textOnly && ['mic_only', 'both'].includes(prefs.audioMode) ? this.microphone() : Promise.resolve(null),
             ]);
             const loopback = window.cheatingDaddy.isWindows && prefs.audioMode !== 'mic_only' ? await this.systemAudio() : null;
             if (!api.success) this.results.push({ ok: false, text: api.error });
@@ -154,7 +161,7 @@ export class SessionConsole extends LitElement {
                 if (loopback) this.results.push(loopback);
                 else if (prefs.audioMode !== 'mic_only') this.results.push({ ok: audio.ok && audio.detected, text: audio.message });
             }
-            this.results.push({ ok: screen.success, text: screen.success ? 'Захват экрана работает' : screen.error });
+            if (screen) this.results.push({ ok: screen.success, text: screen.success ? 'Захват экрана работает' : screen.error });
             if (mic) this.results.push(mic);
         } catch (e) {
             this.results = [{ ok: false, text: e.message }];
@@ -176,36 +183,29 @@ export class SessionConsole extends LitElement {
                           </div>`
                     : ''
             }
-            <button ?disabled=${this.busy || this.owner._starting} @click=${this.check}>${this.busy ? 'Проверка…' : 'Проверить готовность'}</button>
-
+            <div class="actions">
+                <button
+                    class="primary"
+                    ?disabled=${this.busy || this.owner._starting || this.owner._ending}
+                    @click=${() => this.dispatchEvent(new CustomEvent('start-session', { bubbles: true, composed: true }))}
+                >
+                    ${this.owner._starting ? 'Запуск…' : 'Начать сессию'}
+                </button>
+                <button ?disabled=${this.busy || this.owner._starting} @click=${this.check}>
+                    ${this.busy ? 'Проверяю…' : 'Проверить подключение'}
+                </button>
+            </div>
             ${this.results.map(r => html`<p class=${r.ok ? 'ok' : 'bad'}>${r.ok ? '✓' : '!'} ${r.text}</p>`)}
             ${
                 this.review
-                    ? html`<details open>
-                          <summary>Разбор завершённой сессии</summary>
-                          <p>${this.review.note}</p>
-                          <ul>
-                              ${this.review.tomorrow.map(r => html`<li>${r.task}</li>`)}
-                          </ul>
-                          <div class="actions">
-                              <button
-                                  @click=${() => {
-                                      this.owner._reviewToOpen = this.owner._lastFinishedSessionId;
-                                      this.owner._autoDebrief = true;
-                                      this.owner.navigate('history');
-                                  }}
-                              >
-                                  ИИ-итоги собеса</button
-                              ><button
-                                  @click=${() => {
-                                      this.owner._reviewToOpen = this.owner._lastFinishedSessionId;
-                                      this.owner.navigate('history');
-                                  }}
-                              >
-                                  Открыть полный разбор в History
-                              </button>
-                          </div>
-                      </details>`
+                    ? html`<button
+                          @click=${() => {
+                              this.owner._reviewToOpen = this.owner._lastFinishedSessionId;
+                              this.owner.navigate('history');
+                          }}
+                      >
+                          Последняя сессия →
+                      </button>`
                     : ''
             }
         </div>`;

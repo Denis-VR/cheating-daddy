@@ -100,7 +100,20 @@ function initializeNewSession(profile = null, customPrompt = null) {
     groqConversationHistory = [];
     currentProfile = profile;
     currentCustomPrompt = customPrompt;
-    require('../storage').saveSession(currentSessionId, { profile, customPrompt, conversationHistory: [], screenAnalysisHistory: [] });
+    const preparation = require('./interview-storage').selectedPreparation();
+    const profileName =
+        require('../storage')
+            .getPreferences()
+            .aiProfiles?.find(p => p.id === profile)?.name || profile;
+    require('../storage').saveSession(currentSessionId, {
+        profile,
+        profileName,
+        vacancyName: preparation.name,
+        resumeName: preparation.resumeName,
+        customPrompt,
+        conversationHistory: [],
+        screenAnalysisHistory: [],
+    });
     console.log('New conversation session started:', currentSessionId, 'profile:', profile);
 
     // Save initial session with profile context
@@ -915,6 +928,32 @@ async function startMacOSAudioCapture(geminiSessionRef) {
     }
 
     console.log('SystemAudioDump started with PID:', systemAudioProc.pid);
+    const captureProcess = systemAudioProc;
+    let readyResolve, readyReject;
+    const ready = new Promise((resolve, reject) => {
+        readyResolve = resolve;
+        readyReject = reject;
+    });
+    const readyTimer = setTimeout(() => {
+        readyReject(new Error('Нет звука от macOS. Проверьте разрешение записи экрана и системного аудио.'));
+        captureProcess.kill();
+    }, 8000);
+    const markReady = () => {
+        clearTimeout(readyTimer);
+        readyResolve(true);
+    };
+    captureProcess.stdout.once('data', markReady);
+    captureProcess.stderr.on('data', data => {
+        if (/Capturing system audio/.test(data.toString())) markReady();
+    });
+    captureProcess.once('error', error => {
+        clearTimeout(readyTimer);
+        readyReject(error);
+    });
+    captureProcess.once('close', () => {
+        clearTimeout(readyTimer);
+        readyReject(new Error('Захват звука Mac остановлен. Разрешите запись экрана и системного аудио в настройках macOS.'));
+    });
 
     const CHUNK_DURATION = 0.1;
     const SAMPLE_RATE = 24000;
@@ -966,7 +1005,10 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     systemAudioProc.on('close', code => {
         console.log('SystemAudioDump process closed with code:', code);
-        systemAudioProc = null;
+        if (systemAudioProc === captureProcess) {
+            systemAudioProc = null;
+            sendToRenderer('update-status', 'Захват звука Mac остановлен. Проверьте разрешения macOS.');
+        }
     });
 
     systemAudioProc.on('error', err => {
@@ -974,7 +1016,7 @@ async function startMacOSAudioCapture(geminiSessionRef) {
         systemAudioProc = null;
     });
 
-    return true;
+    return await ready;
 }
 
 function convertStereoToMono(stereoBuffer) {
@@ -983,7 +1025,8 @@ function convertStereoToMono(stereoBuffer) {
 
     for (let i = 0; i < samples; i++) {
         const leftSample = stereoBuffer.readInt16LE(i * 4);
-        monoBuffer.writeInt16LE(leftSample, i * 2);
+        const rightSample = stereoBuffer.readInt16LE(i * 4 + 2);
+        monoBuffer.writeInt16LE(Math.round((leftSample + rightSample) / 2), i * 2);
     }
 
     return monoBuffer;
@@ -1079,7 +1122,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         try {
             if (
                 !options ||
-                !PROVIDERS[options.provider] ||
+                (!PROVIDERS[options.provider] && !['claude-code', 'codex'].includes(options.provider)) ||
                 typeof options.profile !== 'string' ||
                 typeof options.language !== 'string' ||
                 !/^[a-z]{2}(-[A-Za-z]{2,4})?$/.test(options.language) ||
@@ -1091,20 +1134,35 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             const { provider, profile, customPrompt, language } = options;
             const config = getConfig();
             const credentials = getCredentials();
+            const bridge = ['claude-code', 'codex'].includes(provider);
+            const mediaProvider = bridge ? config.bridgeMediaProvider || 'openrouter' : provider;
+            if (!['openai', 'openrouter', 'none'].includes(mediaProvider)) throw Error('Неизвестный провайдер распознавания');
+            const apiProvider = mediaProvider === 'none' ? 'openai' : mediaProvider;
+            if (bridge) require('./cli-bridge').executable(provider);
+            if (
+                bridge &&
+                mediaProvider !== 'none' &&
+                !(credentials[PROVIDERS[apiProvider].keyField] || (apiProvider === 'openai' && credentials.openaiApiKey))
+            )
+                throw Error('Укажите API-ключ для распознавания или выберите «Только текст — без API» в настройках подключения.');
             const session = new HostedSession({
-                provider,
-                key: credentials[PROVIDERS[provider].keyField] || (provider === 'openai' ? credentials.openaiApiKey : ''),
-                model: config[`${provider}Model`] || PROVIDERS[provider].model,
-                transcriptionModel: config[`${provider}TranscriptionModel`],
-                ocrModel: config[`${provider}OcrModel`],
-                visionModel: config[`${provider}VisionModel`],
+                provider: apiProvider,
+                key:
+                    mediaProvider === 'none'
+                        ? 'text-only'
+                        : credentials[PROVIDERS[apiProvider].keyField] || (apiProvider === 'openai' ? credentials.openaiApiKey : ''),
+                model: config[`${apiProvider}Model`] || PROVIDERS[apiProvider].model,
+                transcriptionModel: config[`${apiProvider}TranscriptionModel`],
+                ocrModel: config[`${apiProvider}OcrModel`],
+                visionModel: config[`${apiProvider}VisionModel`],
+                mediaEnabled: mediaProvider !== 'none',
+                completion: bridge
+                    ? (messages, signal) => require('./cli-bridge').runBridge({ provider, model: config[provider + 'Model'] || '', messages, signal })
+                    : null,
                 systemPrompt: require('./prompts').getHostedSystemPrompt(profile, customPrompt, language),
                 language,
                 reviewAudio: true,
-                preparation: (() => {
-                    const w = require('./interview-storage').loadWorkspace();
-                    return w.packages.find(p => p.id === w.activePackageId);
-                })(),
+                preparation: require('./interview-storage').selectedPreparation(),
                 emit: sendToRenderer,
                 save: (text, answer, model) => (model ? saveScreenAnalysis(text, answer, model) : saveConversationTurn(text, answer)),
             });
@@ -1189,7 +1247,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle(
         'interview:ocr',
         guarded(async value => {
-            if (!hostedSession) throw new Error('Запустите сессию OpenAI или OpenRouter');
+            if (!hostedSession) throw new Error('Запустите сессию AI');
             require('./interview-workflow').validateRequest({ ...value, text: 'OCR', requestId: 'ocr' });
             return hostedSession.enqueue({ ocrOnly: true, images: value.images, requestId: 'ocr' });
         })
@@ -1197,7 +1255,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle(
         'interview:ask',
         guarded(async value => {
-            if (!hostedSession) throw new Error('Этот режим требует сессию OpenAI или OpenRouter');
+            if (!hostedSession) throw new Error('Запустите сессию AI');
             require('./interview-workflow').validateRequest(value);
             if (value.questionId) {
                 const item = hostedSession.questions.items.find(q => q.id === value.questionId);

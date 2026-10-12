@@ -2,7 +2,8 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
+app.setName('Cheating Daddy');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
@@ -33,6 +34,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+    require('./utils/cli-bridge').closeBridges();
     stopMacOSAudioCapture();
     require('./utils/localai').closeLocalSession();
 });
@@ -268,6 +270,19 @@ function setupStorageIpcHandlers() {
 }
 
 function setupGeneralIpcHandlers() {
+    ipcMain.handle('confirm-session-visibility', async () => {
+        if (storage.getConfig().showInScreenSharing !== true) return true;
+        const result = await dialog.showMessageBox(mainWindow, {
+            type: 'warning',
+            title: 'Окно видно на демонстрации',
+            message: 'Окно ассистента может попасть в демонстрацию экрана.',
+            detail: 'Включено «Показывать окно при демонстрации экрана». Можно отменить запуск и выключить эту настройку.',
+            buttons: ['Отмена', 'Начать сессию'],
+            defaultId: 0,
+            cancelId: 0,
+        });
+        return result.response === 1;
+    });
     ipcMain.handle('get-app-version', async () => {
         return app.getVersion();
     });

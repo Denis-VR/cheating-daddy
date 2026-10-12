@@ -252,12 +252,12 @@ export class CustomizeView extends LitElement {
 
     getProfiles() {
         return [
-            { value: 'interview', name: 'Job Interview' },
-            { value: 'sales', name: 'Sales Call' },
-            { value: 'meeting', name: 'Business Meeting' },
-            { value: 'presentation', name: 'Presentation' },
-            { value: 'negotiation', name: 'Negotiation' },
-            { value: 'exam', name: 'Exam Assistant' },
+            { value: 'interview', name: 'Собеседование' },
+            { value: 'sales', name: 'Продажи' },
+            { value: 'meeting', name: 'Встреча' },
+            { value: 'presentation', name: 'Презентация' },
+            { value: 'negotiation', name: 'Переговоры' },
+            { value: 'exam', name: 'Экзамен' },
         ];
     }
 
@@ -316,28 +316,30 @@ export class CustomizeView extends LitElement {
             decreaseOpacity: isMac ? 'Cmd+Alt+Left' : 'Ctrl+Alt+Left',
             increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
             toggleTeleprompter: isMac ? 'Cmd+Alt+S' : 'Ctrl+Alt+S',
+            shortcutsHelp: isMac ? 'Cmd+K' : 'Ctrl+K',
         };
     }
 
     getKeybindActions() {
         return [
-            { key: 'moveUp', name: 'Move Window Up', description: 'Move the app window up' },
-            { key: 'moveDown', name: 'Move Window Down', description: 'Move the app window down' },
-            { key: 'moveLeft', name: 'Move Window Left', description: 'Move the app window left' },
-            { key: 'moveRight', name: 'Move Window Right', description: 'Move the app window right' },
-            { key: 'toggleVisibility', name: 'Toggle Visibility', description: 'Show or hide the app window' },
-            { key: 'toggleClickThrough', name: 'Toggle Click-through', description: 'Enable or disable click-through mode' },
-            { key: 'nextStep', name: 'Ask Next Step', description: 'Take screenshot and ask for next step' },
-            { key: 'previousResponse', name: 'Previous Response', description: 'Move to previous AI response' },
-            { key: 'nextResponse', name: 'Next Response', description: 'Move to next AI response' },
-            { key: 'scrollUp', name: 'Scroll Response Up', description: 'Scroll response content upward' },
+            { key: 'shortcutsHelp', name: 'Шпаргалка горячих клавиш', description: 'Открыть отдельное окно с основными клавишами и подробностями' },
+            { key: 'moveUp', name: 'Сдвинуть окно вверх', description: 'Сдвиг окна вверх' },
+            { key: 'moveDown', name: 'Сдвинуть окно вниз', description: 'Сдвиг окна вниз' },
+            { key: 'moveLeft', name: 'Сдвинуть окно влево', description: 'Сдвиг окна влево' },
+            { key: 'moveRight', name: 'Сдвинуть окно вправо', description: 'Сдвиг окна вправо' },
+            { key: 'toggleVisibility', name: 'Показать / скрыть окно', description: 'Показать или скрыть окно' },
+            { key: 'toggleClickThrough', name: 'Пропускать клики', description: 'Включить или выключить пропуск кликов' },
+            { key: 'nextStep', name: 'Следующий шаг', description: 'Сделать снимок и запросить следующий шаг' },
+            { key: 'previousResponse', name: 'Предыдущий ответ', description: 'Перейти к предыдущему ответу' },
+            { key: 'nextResponse', name: 'Следующий ответ', description: 'Перейти к следующему ответу' },
+            { key: 'scrollUp', name: 'Прокрутить ответ вверх', description: 'Прокрутка ответа вверх' },
             { key: 'focusMode', name: 'Только ответ / настройки', description: 'Переключить режим чтения' },
             { key: 'increaseFont', name: 'Увеличить шрифт ответа', description: 'Увеличить шрифт во время сессии' },
             { key: 'decreaseFont', name: 'Уменьшить шрифт ответа', description: 'Уменьшить шрифт во время сессии' },
             { key: 'decreaseOpacity', name: 'Прозрачнее окно', description: 'Сделать окно прозрачнее, чтобы видеть экран под ним' },
             { key: 'increaseOpacity', name: 'Плотнее окно', description: 'Сделать окно менее прозрачным' },
             { key: 'toggleTeleprompter', name: 'Суфлёр', description: 'Включить или выключить автопрокрутку ответа' },
-            { key: 'scrollDown', name: 'Scroll Response Down', description: 'Scroll response content downward' },
+            { key: 'scrollDown', name: 'Прокрутить ответ вниз', description: 'Прокрутка ответа вниз' },
         ];
     }
 
@@ -377,6 +379,7 @@ export class CustomizeView extends LitElement {
     async handleAudioModeSelect(e) {
         this.audioMode = e.target.value;
         await cheatingDaddy.storage.updatePreference('audioMode', this.audioMode);
+        await cheatingDaddy.storage.updatePreference('showTranscript', true);
         this.requestUpdate();
     }
 
@@ -560,11 +563,11 @@ export class CustomizeView extends LitElement {
             this.updateFontSize();
             await cheatingDaddy.theme.save(defaults.theme);
 
-            this.clearStatusMessage = 'All settings restored to defaults';
+            this.clearStatusMessage = 'Настройки сброшены';
             this.clearStatusType = 'success';
         } catch (error) {
-            console.error('Error restoring settings:', error);
-            this.clearStatusMessage = `Error restoring settings: ${error.message}`;
+            console.error('Ошибка сброса настроек:', error);
+            this.clearStatusMessage = `Ошибка сброса настроек: ${error.message}`;
             this.clearStatusType = 'error';
         } finally {
             this.isRestoring = false;
@@ -580,11 +583,11 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
         try {
             await cheatingDaddy.storage.clearAll();
-            this.clearStatusMessage = 'Successfully cleared all local data';
+            this.clearStatusMessage = 'Локальные данные удалены';
             this.clearStatusType = 'success';
             this.requestUpdate();
             setTimeout(() => {
-                this.clearStatusMessage = 'Closing application...';
+                this.clearStatusMessage = 'Закрытие приложения…';
                 this.requestUpdate();
                 setTimeout(async () => {
                     if (window.require) {
@@ -594,8 +597,8 @@ export class CustomizeView extends LitElement {
                 }, 1000);
             }, 2000);
         } catch (error) {
-            console.error('Error clearing data:', error);
-            this.clearStatusMessage = `Error clearing data: ${error.message}`;
+            console.error('Ошибка удаления данных:', error);
+            this.clearStatusMessage = `Ошибка удаления данных: ${error.message}`;
             this.clearStatusType = 'error';
         } finally {
             this.isClearing = false;
@@ -606,29 +609,27 @@ export class CustomizeView extends LitElement {
     renderAudioSection() {
         return html`
             <section class="surface">
-                <div class="surface-title">Audio Input</div>
+                <div class="surface-title">Звук</div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label">Audio Mode</label>
+                        <label class="form-label">Источник звука</label>
                         <select class="control" .value=${this.audioMode} @change=${this.handleAudioModeSelect}>
-                            <option value="speaker_only">Speaker Only (Interviewer)</option>
-                            <option value="mic_only">Microphone Only (Me)</option>
-                            <option value="both">Both Speaker and Microphone</option>
+                            <option value="speaker_only">Звук компьютера — звонки, видео, голосовые</option>
+                            <option value="mic_only">Только микрофон</option>
+                            <option value="both">Звук компьютера + микрофон</option>
                         </select>
                     </div>
                     ${
                         this.audioMode !== 'speaker_only'
-                            ? html`
-                                  <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
-                              `
+                            ? html` <div class="warning-callout">Микрофон отображается отдельно от речи собеседника.</div> `
                             : ''
                     }
                     <div class="form-group">
-                        <label class="form-label">Image Quality</label>
+                        <label class="form-label">Качество снимков</label>
                         <select class="control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
-                            <option value="high">High Quality</option>
-                            <option value="medium">Medium Quality</option>
-                            <option value="low">Low Quality</option>
+                            <option value="high">Высокое</option>
+                            <option value="medium">Среднее</option>
+                            <option value="low">Низкое</option>
                         </select>
                     </div>
                 </div>
@@ -639,12 +640,12 @@ export class CustomizeView extends LitElement {
     renderLanguageSection() {
         return html`
             <section class="surface">
-                <div class="surface-title">Language</div>
+                <div class="surface-title">Язык</div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label">Speech Language</label>
+                        <label class="form-label">Язык распознавания</label>
                         <select class="control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
-                            ${this.getLanguages().map(language => html`<option value=${language.value} ?selected=${language.value === this.selectedLanguage}>${language.name}</option>`)}
+                            ${this.getLanguages().map(language => html`<option value=${language.value} ?selected=${language.value === this.selectedLanguage}>${new Intl.DisplayNames(['ru'], { type: 'language' }).of(language.value)}</option>`)}
                         </select>
                     </div>
                 </div>
@@ -655,7 +656,7 @@ export class CustomizeView extends LitElement {
     renderAppearanceSection() {
         return html`
             <section class="surface">
-                <div class="surface-title">Appearance</div>
+                <div class="surface-title">Внешний вид</div>
                 <label class="toggle-row">
                     <span class="toggle-label">Показывать окно при демонстрации экрана</span>
                     <input
@@ -669,14 +670,14 @@ export class CustomizeView extends LitElement {
                 ${this.sharingError ? html`<div role="alert">${this.sharingError}</div>` : ''}
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label">Theme</label>
+                        <label class="form-label">Тема</label>
                         <select class="control" .value=${this.theme} @change=${this.handleThemeChange}>
                             ${this.getThemes().map(theme => html`<option value=${theme.value}>${theme.name}</option>`)}
                         </select>
                     </div>
                     <div class="form-group slider-wrap">
                         <div class="slider-header">
-                            <label class="form-label">Background Transparency</label>
+                            <label class="form-label">Прозрачность фона</label>
                             <span class="slider-value">${Math.round(this.backgroundTransparency * 100)}%</span>
                         </div>
                         <input
@@ -691,7 +692,7 @@ export class CustomizeView extends LitElement {
                     </div>
                     <div class="form-group slider-wrap">
                         <div class="slider-header">
-                            <label class="form-label">Response Font Size</label>
+                            <label class="form-label">Размер текста ответа</label>
                             <span class="slider-value">${this.fontSize}px</span>
                         </div>
                         <input
@@ -712,7 +713,7 @@ export class CustomizeView extends LitElement {
     renderKeyboardSection() {
         return html`
             <section class="surface">
-                <div class="surface-title">Keyboard Shortcuts</div>
+                <div class="surface-title">Горячие клавиши</div>
                 ${this.getKeybindActions().map(
                     action => html`
                         <div class="keybind-row">
@@ -730,7 +731,7 @@ export class CustomizeView extends LitElement {
                     `
                 )}
                 <div style="margin-top: var(--space-sm);">
-                    <button class="control" style="width:auto;padding:8px 10px;" @click=${this.resetKeybinds}>Reset to defaults</button>
+                    <button class="control" style="width:auto;padding:8px 10px;" @click=${this.resetKeybinds}>Сбросить сочетания</button>
                 </div>
             </section>
         `;
@@ -739,13 +740,13 @@ export class CustomizeView extends LitElement {
     renderPrivacySection() {
         return html`
             <section class="surface danger-surface">
-                <div class="surface-title danger">Privacy and Data</div>
+                <div class="surface-title danger">Данные и конфиденциальность</div>
                 <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
                     <button class="danger-button" @click=${this.restoreAllSettings} ?disabled=${this.isRestoring}>
-                        ${this.isRestoring ? 'Restoring...' : 'Restore all settings'}
+                        ${this.isRestoring ? 'Сброс…' : 'Сбросить настройки'}
                     </button>
                     <button class="danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
-                        ${this.isClearing ? 'Clearing...' : 'Delete all data'}
+                        ${this.isClearing ? 'Удаление…' : 'Удалить все данные'}
                     </button>
                 </div>
                 ${
@@ -761,7 +762,7 @@ export class CustomizeView extends LitElement {
         return html`
             <div class="unified-page">
                 <div class="unified-wrap">
-                    <div class="page-title">Settings</div>
+                    <div class="page-title">Настройки</div>
                     ${this.renderAudioSection()} ${this.renderLanguageSection()} ${this.renderAppearanceSection()} ${this.renderKeyboardSection()}
                     ${this.renderPrivacySection()}
                 </div>

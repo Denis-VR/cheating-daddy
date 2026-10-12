@@ -21,7 +21,7 @@ function validateSnapshot(value) {
         typeof value.draft !== 'string' ||
         value.draft.length > 30000 ||
         !Number.isInteger(value.index) ||
-        !['openai', 'openrouter'].includes(value.provider) ||
+        !['openai', 'openrouter', 'claude-code', 'codex'].includes(value.provider) ||
         JSON.stringify(value).length > 20000000
     )
         throw new Error('Некорректные данные восстановления');
@@ -141,6 +141,17 @@ function reviewSession(session) {
     };
 }
 async function probeModel(provider, fetchImpl = fetch) {
+    if (['claude-code', 'codex'].includes(provider)) {
+        const started = Date.now();
+        await require('./cli-bridge').runBridge({
+            provider,
+            model: storage.getConfig()[provider + 'Model'] || '',
+            messages: [{ role: 'user', content: 'Reply only OK.' }],
+            timeoutMs: 60000,
+        });
+        return { model: provider, seconds: Math.round((Date.now() - started) / 100) / 10 };
+    }
+
     if (!PROVIDERS[provider]) throw new Error('Проверка модели доступна для OpenAI / OpenRouter');
     const config = storage.getConfig(),
         credentials = storage.getCredentials();
@@ -293,7 +304,11 @@ function installSessionSupport(ipcMain, isActive) {
             if (isActive() || probing) throw new Error('Завершите текущую сессию или дождитесь проверки');
             probing = true;
             try {
-                const results = await Promise.allSettled([probeModel(provider), probeSystemAudio()]);
+                const textOnly = ['claude-code', 'codex'].includes(provider) && storage.getConfig().bridgeMediaProvider === 'none';
+                const results = await Promise.allSettled([
+                    probeModel(provider),
+                    textOnly ? Promise.resolve({ detected: true, message: 'Текстовый режим — звук не используется' }) : probeSystemAudio(),
+                ]);
                 return results.map(r => (r.status === 'fulfilled' ? { ok: true, ...r.value } : { ok: false, message: r.reason.message }));
             } finally {
                 probing = false;

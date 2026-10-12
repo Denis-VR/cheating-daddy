@@ -7,16 +7,16 @@ const OPENROUTER_RESPONSE_MODELS = [
 ];
 
 const LOCAL_LLM_PRESETS = [
-    { value: 'unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M', label: 'Qwen 3.5 0.8B Q4 — 0.74 GB · Fastest' },
+    { value: 'unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M', label: 'Qwen 3.5 0.8B Q4 — 0.74 GB · Быстрее' },
     { value: 'unsloth/Qwen3.5-0.8B-GGUF:Q8_0', label: 'Qwen 3.5 0.8B Q8 — 1.02 GB' },
     { value: 'unsloth/Qwen3.5-2B-GGUF:Q4_K_M', label: 'Qwen 3.5 2B Q4 — 1.95 GB' },
     { value: 'unsloth/Qwen3.5-2B-GGUF:Q8_0', label: 'Qwen 3.5 2B Q8 — 2.68 GB' },
-    { value: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M', label: 'Qwen 3.5 4B Q4 — 3.42 GB · Recommended' },
+    { value: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M', label: 'Qwen 3.5 4B Q4 — 3.42 GB · Рекомендуется' },
     { value: 'unsloth/Qwen3.5-4B-GGUF:Q8_0', label: 'Qwen 3.5 4B Q8 — 5.16 GB' },
     { value: 'unsloth/Qwen3.5-9B-GGUF:Q4_K_M', label: 'Qwen 3.5 9B Q4 — 6.60 GB' },
     { value: 'unsloth/Qwen3.5-9B-GGUF:Q8_0', label: 'Qwen 3.5 9B Q8 — 10.45 GB' },
     { value: 'unsloth/Qwen3.5-27B-GGUF:Q4_K_M', label: 'Qwen 3.5 27B Q4 — 17.67 GB' },
-    { value: 'unsloth/Qwen3.5-35B-A3B-GGUF:Q4_K_M', label: 'Qwen 3.5 35B-A3B Q4 — 22.92 GB · Largest' },
+    { value: 'unsloth/Qwen3.5-35B-A3B-GGUF:Q4_K_M', label: 'Qwen 3.5 35B-A3B Q4 — 22.92 GB · Большая' },
 ];
 
 export class MainView extends LitElement {
@@ -200,7 +200,7 @@ export class MainView extends LitElement {
 
         .form-wrapper {
             width: 100%;
-            max-width: 420px;
+            max-width: 820px;
             display: flex;
             flex-direction: column;
             gap: var(--space-md);
@@ -447,6 +447,25 @@ export class MainView extends LitElement {
             line-height: var(--line-height);
         }
 
+        .model-card {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            text-align: left;
+        }
+        .model-ratings {
+            display: flex;
+            gap: 24px;
+        }
+        .model-ratings span {
+            display: grid;
+            gap: 4px;
+            flex: 1;
+        }
+        .model-ratings meter {
+            width: 100%;
+        }
         .form-hint {
             font-size: var(--font-size-xs);
             color: var(--text-muted);
@@ -848,16 +867,135 @@ export class MainView extends LitElement {
             color: var(--warning);
             line-height: var(--line-height);
         }
+
+        .form-wrapper {
+            padding: 20px;
+            gap: 14px;
+        }
+        .setup-card {
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-surface);
+        }
+        .section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+        .page-title {
+            font-size: 22px;
+            margin: 0;
+        }
+        .context-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        label select,
+        label input {
+            width: 100%;
+            min-width: 0;
+        }
+        .text-button,
+        .model-select {
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 7px 10px;
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+            cursor: pointer;
+        }
+        .text-button {
+            font-size: 12px;
+        }
+        .model-select {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            text-align: left;
+            gap: 12px;
+            font-size: 14px;
+        }
+        .model-select span {
+            color: var(--text-muted);
+        }
+        .model-select[aria-pressed='true'] {
+            border-color: var(--accent);
+        }
+        .connection-settings {
+            margin-top: 12px;
+        }
+        .connection-settings summary {
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .connection-settings > label,
+        .connection-settings > div {
+            margin-top: 12px;
+        }
+        .model-backdrop {
+            position: fixed;
+            inset: 0;
+            background: #0009;
+            display: grid;
+            place-items: center;
+            z-index: 100;
+            padding: 20px;
+        }
+        .model-dialog {
+            width: min(460px, 100%);
+            max-height: 80vh;
+            overflow: auto;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--bg-app);
+            display: grid;
+            gap: 14px;
+        }
+        .model-options {
+            display: grid;
+            gap: 8px;
+        }
+        @media (max-width: 600px) {
+            .context-grid {
+                grid-template-columns: 1fr;
+            }
+            .form-wrapper {
+                padding: 12px;
+            }
+        }
     `;
 
     static properties = {
+        recovery: { type: Object },
+        review: { type: Object },
+        _contextPrefs: { state: true },
+        _workspace: { state: true },
+        _modelPicker: { state: true },
+        _sharingVisible: { state: true },
+        _selectionBusy: { state: true },
+        _pageError: { state: true },
+
         onStart: { type: Function },
         onExternalLink: { type: Function },
         selectedProfile: { type: String },
         onProfileChange: { type: Function },
         isInitializing: { type: Boolean },
         errorMessage: { type: String },
-        whisperDownloading: { type: Boolean },
+        whisperЗагрузка: { type: Boolean },
         downloadProgress: { type: Object },
         onCancelDownload: { type: Function },
         // Internal state
@@ -897,6 +1035,12 @@ export class MainView extends LitElement {
 
     constructor() {
         super();
+        this._contextPrefs = { aiProfiles: [], instructionPresets: [] };
+        this._workspace = { resumes: [], vacancies: [], activeResumeId: '', activeVacancyId: '' };
+        this._modelPicker = false;
+        this._selectionBusy = false;
+        this._pageError = '';
+
         this.onStart = () => {};
         this.onExternalLink = () => {};
         this.selectedProfile = 'interview';
@@ -950,6 +1094,11 @@ export class MainView extends LitElement {
                 cheatingDaddy.storage.getCredentials().catch(() => ({})),
             ]);
 
+            this._sharingVisible = config.showInScreenSharing === true;
+            this._contextPrefs = prefs;
+            const workspace = await window.require('electron').ipcRenderer.invoke('interview:workspace-load');
+            if (!workspace.success) throw Error(workspace.error);
+            this._workspace = workspace.data;
             this._instructionName = prefs.instructionPresets?.find(item => item.id === prefs.activeInstructionId)?.name || 'Мои инструкции';
             const storedMode = prefs.providerMode || 'byok';
             this._mode = storedMode === 'cloud' ? 'byok' : storedMode;
@@ -979,6 +1128,7 @@ export class MainView extends LitElement {
 
             this.requestUpdate();
         } catch (e) {
+            this._pageError = e.message;
             console.error('Error loading MainView storage:', e);
         }
     }
@@ -1005,6 +1155,9 @@ export class MainView extends LitElement {
 
     updated(changedProperties) {
         super.updated(changedProperties);
+        if (changedProperties.has('_modelPicker')) {
+            this.shadowRoot.querySelector(this._modelPicker ? '.model-dialog button' : '.model-select')?.focus();
+        }
         if (changedProperties.has('_mode')) {
             // Stop old animation when switching modes
             if (this._animId) {
@@ -1109,6 +1262,18 @@ export class MainView extends LitElement {
     }
 
     _handleKeydown(e) {
+        if (this._modelPicker && e.key === 'Tab') {
+            const controls = [...this.shadowRoot.querySelectorAll('.model-dialog button, .model-dialog input')];
+            const current = controls.indexOf(this.shadowRoot.activeElement);
+            if ((e.shiftKey && current <= 0) || (!e.shiftKey && current === controls.length - 1)) {
+                e.preventDefault();
+                controls[e.shiftKey ? controls.length - 1 : 0]?.focus();
+            }
+        }
+        if (e.key === 'Escape' && this._modelPicker) {
+            this._modelPicker = false;
+            return;
+        }
         if (e.key === 'Escape' && this._showLocalHelp) {
             this._closeLocalHelp();
             return;
@@ -1231,7 +1396,7 @@ export class MainView extends LitElement {
 
     _handleStart() {
         if (this._benchmarkBusy || this._recording || this._audioPending) return;
-        if (this.isInitializing || this.downloadProgress.active) return;
+        if (this.isInitializing || this.downloadProgress.active || this._selectionBusy) return;
 
         if (this._mode === 'byok') {
             if (!this._geminiKey.trim()) {
@@ -1331,7 +1496,7 @@ export class MainView extends LitElement {
                         : ''
                 }
                 <span class="btn-label">
-                    ${isDownloading ? (hasPercentage ? `${percentage}%` : 'Preparing...') : 'Start Session'}
+                    ${isDownloading ? (hasPercentage ? `${percentage}%` : 'Подготовка…') : 'Начать сессию'}
                     ${isDownloading ? '' : html`<span class="shortcut-hint">${isMac ? cmdIcon : ctrlIcon}${enterIcon}</span>`}
                 </span>
             </button>
@@ -1339,8 +1504,8 @@ export class MainView extends LitElement {
                 isDownloading
                     ? html`
                           <div class="download-controls">
-                              <span>Downloading: ${this.downloadProgress.label || 'Local AI files'}</span>
-                              <button class="download-cancel" @click=${() => this.onCancelDownload()}>Cancel</button>
+                              <span>Загрузка: ${this.downloadProgress.label || 'Файлы локального AI'}</span>
+                              <button class="download-cancel" @click=${() => this.onCancelDownload()}>Отмена</button>
                           </div>
                       `
                     : ''
@@ -1377,28 +1542,28 @@ export class MainView extends LitElement {
             <details class="config-section">
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">Transcription</span>
-                        <span class="config-summary-description">Gemini Live connection</span>
+                        <span class="config-summary-title">Распознавание речи</span>
+                        <span class="config-summary-description">Подключение Gemini Live</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     <div class="form-group">
-                        <label class="form-label">Gemini API Key</label>
+                        <label class="form-label">API-ключ Gemini</label>
                         <input
                             type="password"
-                            placeholder="Required"
+                            placeholder="Обязательно"
                             .value=${this._geminiKey}
                             @input=${e => this._saveGeminiKey(e.target.value)}
                             class=${this._keyError ? 'error' : ''}
                         />
                         <div class="form-hint">
-                            <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get Gemini key</span>
+                            <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Получить ключ Gemini</span>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Gemini Live Model</label>
+                        <label class="form-label">Модель Gemini Live</label>
                         <input type="text" .value=${this._geminiLiveModel} @input=${e => this._saveGeminiLiveModel(e.target.value)} />
                     </div>
                 </div>
@@ -1407,27 +1572,27 @@ export class MainView extends LitElement {
             <details class="config-section">
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">AI responses</span>
-                        <span class="config-summary-description">Groq key and response model</span>
+                        <span class="config-summary-title">Ответы AI</span>
+                        <span class="config-summary-description">Ключ Groq и модель ответа</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     <div class="form-group">
-                        <label class="form-label">Groq API Key</label>
-                        <input type="password" placeholder="Optional" .value=${this._groqKey} @input=${e => this._saveGroqKey(e.target.value)} />
+                        <label class="form-label">API-ключ Groq</label>
+                        <input type="password" placeholder="Необязательно" .value=${this._groqKey} @input=${e => this._saveGroqKey(e.target.value)} />
                         <div class="form-hint">
-                            <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
+                            <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Получить ключ Groq</span>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Groq Model</label>
+                        <label class="form-label">Модель Groq</label>
                         <input type="text" .value=${this._groqModel} @input=${e => this._saveGroqModel(e.target.value)} />
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Groq Image Model</label>
+                        <label class="form-label">Модель изображений Groq</label>
                         <input type="text" .value=${this._groqImageModel} @input=${e => this._saveGroqImageModel(e.target.value)} />
                     </div>
 
@@ -1438,8 +1603,8 @@ export class MainView extends LitElement {
                             @change=${e => this._saveDisableGroqThinking(e.target.checked)}
                         />
                         <span class="config-checkbox-text">
-                            <span class="config-summary-title">Disable thinking</span>
-                            <span class="config-summary-description">Faster responses with less internal reasoning</span>
+                            <span class="config-summary-title">Короткое рассуждение</span>
+                            <span class="config-summary-description">Ускоряет генерацию ответа</span>
                         </span>
                     </label>
 
@@ -1449,12 +1614,12 @@ export class MainView extends LitElement {
                 </div>
             </details>
 
-            ${this._renderStartButton()} ${this._renderDivider()}
+            ${this._renderDivider()}
 
             <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
-                <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
+                <button class="mode-link" @click=${() => this._saveMode('local')}>Локальные модели</button>
             </div>
         `;
     }
@@ -1468,7 +1633,10 @@ export class MainView extends LitElement {
         const result = credential
             ? await cheatingDaddy.storage.setCredentials({ [field]: value.trim() })
             : await cheatingDaddy.storage.updateConfig(field, value.trim());
-        if (!result.success) this._keyError = true;
+        if (!result.success) {
+            this._keyError = true;
+            this._pageError = result.error || 'Не удалось сохранить настройки';
+        }
     }
 
     async recordBenchmark() {
@@ -1649,182 +1817,212 @@ export class MainView extends LitElement {
             }`;
     }
 
+    async _selectContext(field, id) {
+        if (this._selectionBusy) return;
+        this._selectionBusy = true;
+        this._pageError = '';
+        try {
+            if (field === 'activeResumeId' || field === 'activeVacancyId') {
+                const result = await window.require('electron').ipcRenderer.invoke('interview:workspace-save', { ...this._workspace, [field]: id });
+                if (!result.success) throw Error(result.error);
+                this._workspace = result.data;
+            } else {
+                const patch = { [field]: id };
+                if (field === 'activeInstructionId' && !id) {
+                    patch.instructionPresets = [
+                        ...this._contextPrefs.instructionPresets.filter(p => p.id !== 'no-instructions'),
+                        { id: 'no-instructions', name: 'Без дополнительных инструкций', text: '' },
+                    ];
+                    patch.activeInstructionId = 'no-instructions';
+                }
+                const result = await cheatingDaddy.storage.setPreferences(patch);
+                if (!result.success) throw Error(result.error);
+                this._contextPrefs = await cheatingDaddy.storage.getPreferences();
+                if (field === 'selectedProfile') await this.onProfileChange(id);
+            }
+        } catch (e) {
+            this._pageError = e.message;
+        } finally {
+            this._selectionBusy = false;
+        }
+    }
+    _renderContext() {
+        const prefs = this._contextPrefs;
+        return html`<section class="setup-card">
+            <div class="section-heading">
+                Контекст сессии
+                <button class="text-button" @click=${() => window.cheatingDaddy.element().navigate('ai-customize')}>Редактировать →</button>
+            </div>
+            <div class="context-grid">
+                ${[
+                    ['activeResumeId', 'Резюме', this._workspace.resumes, this._workspace.activeResumeId, 'Без резюме'],
+                    ['activeVacancyId', 'Вакансия', this._workspace.vacancies, this._workspace.activeVacancyId, 'Без вакансии'],
+                    ['selectedProfile', 'Профиль', prefs.aiProfiles, prefs.selectedProfile, 'Без профиля'],
+                    ['activeInstructionId', 'Доп. инструкции', prefs.instructionPresets, prefs.activeInstructionId, 'Без дополнительных инструкций'],
+                ].map(
+                    ([field, label, items, active, empty]) =>
+                        html`<label
+                            >${label}<select
+                                aria-label=${label}
+                                ?disabled=${this._selectionBusy}
+                                .value=${active || ''}
+                                @change=${e => this._selectContext(field, e.target.value)}
+                            >
+                                ${empty ? html`<option value="" ?selected=${!active}>${empty}</option>` : ''}
+                                ${(items || []).map(item => html`<option value=${item.id} ?selected=${item.id === active}>${item.name}</option>`)}
+                            </select></label
+                        >`
+                )}
+            </div>
+        </section>`;
+    }
     _renderHostedMode() {
-        const router = this._mode === 'openrouter';
-        const keyField = router ? 'openrouterKey' : 'openaiKey';
-        const modelField = router ? 'openrouterModel' : 'openaiModel';
-        const customResponse = router && (this._customRouterModel || !OPENROUTER_RESPONSE_MODELS.some(model => model.id === this._openrouterModel));
-        const prefix = router ? 'openrouter' : 'openai';
-        const imageModels = router
-            ? [...OPENROUTER_RESPONSE_MODELS.map(model => model.id), 'openai/gpt-4o-mini', 'google/gemini-2.5-flash-lite']
-            : ['gpt-5.4-nano', 'gpt-4o-mini', 'gpt-4.1-mini'];
-        const fields = [
-            {
-                suffix: 'TranscriptionModel',
-                label: 'Speech to text',
-                fallback: router ? 'openai/whisper-1' : 'whisper-1',
-                choices: router
-                    ? ['openai/gpt-4o-mini-transcribe', 'openai/whisper-1', 'openai/whisper-large-v3']
-                    : ['gpt-4o-mini-transcribe-2025-12-15', 'whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'],
-                hint: 'Модель для /audio/transcriptions. Обычная чат-модель не подойдёт.',
-            },
-            {
-                suffix: 'OcrModel',
-                label: 'Распознавание текста',
-                fallback: router ? 'google/gemini-2.5-flash-lite' : 'gpt-4o-mini',
-                choices: imageModels,
-                hint: 'Режим «Распознать текст»: эта модель извлекает текст, модель ответа решает задачу.',
-            },
-            {
-                suffix: 'VisionModel',
-                label: 'Vision · анализ изображений',
-                fallback: '',
-                choices: imageModels,
-                hint: 'Режим «Анализ изображения»: эта модель получает скриншот целиком и отвечает на вопрос.',
-            },
-        ];
-        return html`
-            <div class="config-section">
-                <div class="config-content">
-                    <div class="form-group">
-                        <label class="form-label" for="hosted-key">${router ? 'OpenRouter' : 'OpenAI'} API Key</label>
-                        <input
-                            id="hosted-key"
+        const router = this._mode === 'openrouter',
+            prefix = router ? 'openrouter' : 'openai';
+        const model = this[`_${prefix}Model`];
+        return html`<section class="setup-card">
+                <div class="section-heading">Модель ответа</div>
+                <button class="model-select" @click=${() => (this._modelPicker = true)}>${model}<span>Выбрать ▾</span></button>
+                <details class="connection-settings" ?open=${this._keyError || !this[`_${prefix}Key`]}>
+                    <summary>Подключение и распознавание</summary>
+                    <label
+                        >API-ключ ${router ? 'OpenRouter' : 'OpenAI'}<input
                             type="password"
                             autocomplete="off"
-                            placeholder="Required"
-                            .value=${this[`_${keyField}`]}
-                            class=${this._keyError ? 'error' : ''}
-                            @input=${e => this._saveHostedField(keyField, e.target.value, true)}
-                        />
+                            aria-label="API-ключ"
+                            .value=${this[`_${prefix}Key`]}
+                            @input=${e => this._saveHostedField(prefix + 'Key', e.target.value, true)}
+                    /></label>
+                    <div class="context-grid">
+                        ${[
+                            ['TranscriptionModel', 'Распознавание речи', router ? 'openai/whisper-1' : 'whisper-1'],
+                            ['OcrModel', 'Распознавание текста на снимке', router ? 'google/gemini-2.5-flash-lite' : 'gpt-4o-mini'],
+                            ['VisionModel', 'Анализ изображений', model],
+                        ].map(
+                            ([suffix, label, fallback]) =>
+                                html`<label
+                                    >${label}<input
+                                        .value=${this._hostedModels[prefix + suffix] || fallback}
+                                        @input=${e => this._saveHostedField(prefix + suffix, e.target.value)}
+                                /></label>`
+                        )}
                     </div>
-                    <div class="form-group">
-                        <label class="form-label" for=${router ? undefined : 'hosted-model'}>Response model · ответы</label>
-                        ${
-                            router
-                                ? html`<div class="model-cards" role="group" aria-label="Модель ответа OpenRouter">
-                                          ${OPENROUTER_RESPONSE_MODELS.map(
-                                              model =>
-                                                  html`<button
-                                                      type="button"
-                                                      class="model-card"
-                                                      data-model=${model.id}
-                                                      aria-pressed=${!customResponse && this._openrouterModel === model.id}
-                                                      @click=${() => {
-                                                          this._customRouterModel = false;
-                                                          this._saveHostedField(modelField, model.id);
-                                                      }}
-                                                  >
-                                                      <span class="model-card-head"
-                                                          ><span>${model.label}</span><span class="model-radio" aria-hidden="true"></span
-                                                      ></span>
-                                                      <span class="model-metrics"
-                                                          >${[
-                                                              ['Speed', model.speed],
-                                                              ['Reasoning', model.reasoning],
-                                                          ].map(
-                                                              ([label, score]) =>
-                                                                  html` <span class="model-metric"
-                                                                      ><span class="model-metric-label"
-                                                                          ><span>${label}</span><span>${score}/5</span></span
-                                                                      >
-                                                                      <span class="model-meter" aria-hidden="true"
-                                                                          >${[1, 2, 3, 4, 5].map(i => html`<i class=${i <= score ? 'filled' : ''}></i>`)}</span
-                                                                      ></span
-                                                                  >`
-                                                          )}</span
-                                                      >
-                                                      <span class="model-price"
-                                                          ><span>Input <strong>$${model.input}</strong></span
-                                                          ><span>Output <strong>$${model.output}</strong></span></span
-                                                      >
-                                                  </button>`
-                                          )}
-                                          <button
-                                              type="button"
-                                              class="custom-model"
-                                              aria-pressed=${!!customResponse}
-                                              @click=${() => {
-                                                  this._customRouterModel = true;
+                    ${this._renderBenchmark()}
+                </details>
+            </section>
+            ${
+                this._modelPicker
+                    ? html`<div class="model-backdrop" @click=${() => (this._modelPicker = false)}>
+                          <section
+                              class="model-dialog"
+                              role="dialog"
+                              aria-modal="true"
+                              aria-label="Выбор модели"
+                              @click=${e => e.stopPropagation()}
+                              @keydown=${e => {
+                                  if (e.key === 'Escape') this._modelPicker = false;
+                              }}
+                          >
+                              <div class="section-heading">
+                                  Модель ответа<button
+                                      class="text-button"
+                                      aria-label="Закрыть выбор модели"
+                                      @click=${() => (this._modelPicker = false)}
+                                  >
+                                      ✕
+                                  </button>
+                              </div>
+                              <div class="model-options">
+                                  ${(router
+                                      ? OPENROUTER_RESPONSE_MODELS
+                                      : [
+                                            { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
+                                            { id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano' },
+                                        ]
+                                  ).map(
+                                      item =>
+                                          html`<button
+                                              class="model-select model-card"
+                                              aria-pressed=${model === item.id}
+                                              @click=${async () => {
+                                                  await this._saveHostedField(prefix + 'Model', item.id);
+                                                  this._modelPicker = false;
                                               }}
                                           >
-                                              Другая модель…
-                                          </button>
-                                      </div>
-                                      <div class="model-price-unit">
-                                          USD за 1 млн токенов · без кеша<br />Speed / Reasoning — условные оценки, не замеры.
-                                      </div>`
-                                : ''
-                        }
-                        ${
-                            !router || customResponse
-                                ? html`<input
-                                      id="hosted-model"
-                                      aria-label="Model ID"
-                                      type="text"
-                                      list="hosted-response-models"
-                                      .value=${this[`_${modelField}`]}
-                                      placeholder=${router ? 'openai/model-id' : 'gpt-4o-mini'}
-                                      @input=${e => this._saveHostedField(modelField, e.target.value)}
-                                  />`
-                                : ''
-                        }
-                        <datalist id="hosted-response-models">
-                            ${(router ? OPENROUTER_RESPONSE_MODELS.map(model => model.id) : ['gpt-4o-mini', 'gpt-5.4-nano']).map(id => html`<option value=${id}></option>`)}
-                        </datalist>
-                        <div class="form-hint">
-                            ${router ? 'Use an openai/ model ID from OpenRouter.' : 'Use an OpenAI model that supports Chat Completions.'}
-                        </div>
-                    </div>
-                    ${fields.map(({ suffix, label, fallback, choices, hint }) => {
-                        const field = `${prefix}${suffix}`;
-                        const stt = suffix === 'TranscriptionModel';
-                        const value = this._hostedModels[field] ?? fallback;
-                        const customStt = stt && (this._customStt[prefix] || !choices.includes(value));
-                        return html`<div class="form-group">
-                            <label class="form-label" for=${stt ? `${field}-select` : field}>${label}</label>
-                            ${
-                                stt
-                                    ? html`<select
-                                          id=${`${field}-select`}
-                                          .value=${customStt ? 'custom' : value}
-                                          @change=${e => {
-                                              this._customStt = { ...this._customStt, [prefix]: e.target.value === 'custom' };
-                                              if (e.target.value !== 'custom') this._saveHostedField(field, e.target.value);
-                                          }}
-                                      >
-                                          ${choices.map(id => html`<option value=${id}>${id}</option>`)}
-                                          <option disabled>GPT Realtime Whisper · нужен Realtime-режим</option>
-                                          <option value="custom">Другая модель…</option>
-                                      </select>`
-                                    : ''
-                            }
-                            ${
-                                !stt || customStt
-                                    ? html`
-                                          <input
-                                              id=${field}
-                                              type="text"
-                                              list=${`${field}-choices`}
-                                              .value=${this._hostedModels[field] ?? fallback}
-                                              placeholder=${suffix === 'VisionModel' ? 'Как модель ответа' : fallback}
-                                              @input=${e => this._saveHostedField(field, e.target.value)}
-                                          />
-                                      `
-                                    : ''
-                            }
-                            <datalist id=${`${field}-choices`}>${choices.map(id => html`<option value=${id}></option>`)}</datalist>
-                            <div class="form-hint">${hint}</div>
-                        </div>`;
-                    })}
-                    <div class="form-hint">
-                        Выберите подсказку или введите свой ID модели. Распознавание текста и анализ изображений требуют поддержки изображений.
-                        Настройки сохраняются автоматически и применяются в новой сессии. API оплачивается отдельно.
-                    </div>
-                </div>
-            </div>
-            ${this._renderBenchmark()} ${this._renderStartButton()}
-        `;
+                                              <strong>${item.label} ${model === item.id ? '✓' : ''}</strong>
+                                              ${
+                                                  router
+                                                      ? html`<div class="model-ratings">
+                                                                <span
+                                                                    >Скорость ${item.speed}/5
+                                                                    <meter min="0" max="5" value=${item.speed}></meter></span
+                                                                ><span
+                                                                    >Интеллект ${item.reasoning}/5
+                                                                    <meter min="0" max="5" value=${item.reasoning}></meter
+                                                                ></span>
+                                                            </div>
+                                                            <small>Вход $${item.input} · выход $${item.output} / 1 млн токенов</small>`
+                                                      : ''
+                                              }
+                                          </button>`
+                                  )}
+                              </div>
+                              <label
+                                  >Другая модель<input
+                                      aria-label="ID модели"
+                                      .value=${model}
+                                      @change=${e => this._saveHostedField(prefix + 'Model', e.target.value)}
+                              /></label>
+                              <button class="text-button" @click=${() => (this._modelPicker = false)}>Готово</button>
+                          </section>
+                      </div>`
+                    : ''
+            }`;
+    }
+    _renderBridgeMode() {
+        const claude = this._mode === 'claude-code';
+        return html`<section class="setup-card">
+            <div class="section-heading">${claude ? 'Claude Code' : 'ChatGPT через Codex'}</div>
+            <p class="form-hint">
+                ${claude ? 'Используется вход в установленный Claude Code.' : 'Используется вход в ChatGPT через установленный Codex CLI.'}
+            </p>
+            <label
+                >Модель<input
+                    placeholder="По умолчанию из CLI"
+                    .value=${this._hostedModels[this._mode + 'Model'] || ''}
+                    @input=${e => this._saveHostedField(this._mode + 'Model', e.target.value)}
+            /></label>
+            <details class="connection-settings">
+                <summary>Подключение</summary>
+                <p class="form-hint">
+                    ${claude ? 'Для входа выполните в терминале: claude auth login' : 'Для входа выполните в терминале: codex login'}
+                </p>
+                <label
+                    >Распознавание речи и снимков<select
+                        .value=${this._hostedModels.bridgeMediaProvider || 'openrouter'}
+                        @change=${e => this._saveHostedField('bridgeMediaProvider', e.target.value)}
+                    >
+                        <option value="openrouter">OpenRouter API</option>
+                        <option value="openai">OpenAI API</option>
+                        <option value="none">Только текст — без API</option>
+                    </select></label
+                >
+                ${
+                    this._hostedModels.bridgeMediaProvider !== 'none'
+                        ? html`<label
+                              >API-ключ для речи и снимков<input
+                                  type="password"
+                                  .value=${this._hostedModels.bridgeMediaProvider === 'openai' ? this._openaiKey : this._openrouterKey}
+                                  @input=${e => this._saveHostedField((this._hostedModels.bridgeMediaProvider === 'openai' ? 'openai' : 'openrouter') + 'Key', e.target.value, true)}
+                          /></label>`
+                        : ''
+                }
+                <p class="form-hint">
+                    Подписка используется для ответов. Распознавание через API оплачивается отдельно; в режиме «Только текст» прослушивание и снимки
+                    недоступны.
+                </p>
+            </details>
+        </section>`;
     }
 
     _renderLocalMode() {
@@ -1832,20 +2030,20 @@ export class MainView extends LitElement {
             <details class="config-section">
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">Language model</span>
-                        <span class="config-summary-description">Local GGUF model</span>
+                        <span class="config-summary-title">Языковая модель</span>
+                        <span class="config-summary-description">Локальная модель GGUF</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     <div class="form-group">
-                        <label class="form-label">Model</label>
+                        <label class="form-label">Модель</label>
                         <select
                             .value=${this._useCustomLocalLlmModel ? 'custom' : this._localLlmModel}
                             @change=${event => this._selectLocalLlmModel(event.target.value)}
                         >
                             ${LOCAL_LLM_PRESETS.map(preset => html`<option value=${preset.value}>${preset.label}</option>`)}
-                            <option value="custom">Custom Hugging Face model or local GGUF…</option>
+                            <option value="custom">Другая модель Hugging Face или файл GGUF…</option>
                         </select>
                         ${
                             this._useCustomLocalLlmModel
@@ -1859,7 +2057,7 @@ export class MainView extends LitElement {
                                   `
                                 : ''
                         }
-                        <div class="form-hint">Sizes include the vision model. Q4 uses less memory; Q8 preserves more quality.</div>
+                        <div class="form-hint">Размер включает модель изображений. Q4 требует меньше памяти; Q8 сохраняет больше точности.</div>
                     </div>
                 </div>
             </details>
@@ -1867,33 +2065,33 @@ export class MainView extends LitElement {
             <details class="config-section">
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">Transcription</span>
-                        <span class="config-summary-description">Whisper speech-to-text model</span>
+                        <span class="config-summary-title">Распознавание речи</span>
+                        <span class="config-summary-description">Распознавание речи Whisper</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     <div class="form-group">
                         <div class="whisper-label-row">
-                            <label class="form-label">Whisper Model</label>
+                            <label class="form-label">Модель Whisper</label>
                             ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
                         </div>
                         <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
-                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny English (75 MB, fastest)</option>
-                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base English (142 MB)</option>
-                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small English (466 MB, most accurate)</option>
+                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny · английский · 75 МБ · быстрее</option>
+                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base · английский · 142 МБ</option>
+                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small · английский · 466 МБ · точнее</option>
                         </select>
-                        <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
+                        <div class="form-hint">${this.whisperDownloading ? 'Загрузка модели…' : 'Загрузится при первом запуске'}</div>
                     </div>
                 </div>
             </details>
 
-            ${this._renderStartButton()} ${this._renderDivider()}
+            ${this._renderDivider()}
 
             <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
-                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+                <button class="mode-link" @click=${() => this._saveMode('byok')}>Подключение через API-ключи</button>
             </div>
         `;
     }
@@ -1901,51 +2099,36 @@ export class MainView extends LitElement {
     // ── Main render ──
 
     render() {
-        const helpIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0m9 5v.01" />
-                <path d="M12 13.5a1.5 1.5 0 0 1 1-1.5a2.6 2.6 0 1 0-3-4" />
-            </g>
-        </svg>`;
-        const closeIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" />
-        </svg>`;
-
-        return html`
-            <div class="form-wrapper">
-                ${
-                    this._mode === 'local'
-                        ? html`
-                              <div class="title-row">
-                                  <div class="page-title">Cheating Daddy <span class="mode-suffix">Local AI</span></div>
-                                  <button class="help-btn" @click=${this._openLocalHelp} aria-label="Open Local AI help">${helpIcon}</button>
-                              </div>
-                          `
-                        : html`
-                              <div class="page-title">
-                                  ${html`Cheating Daddy <span class="mode-suffix">${this._mode === 'openrouter' ? 'OpenRouter' : this._mode === 'openai' ? 'OpenAI' : 'BYOK'}</span>`}
-                              </div>
-                          `
-                }
-                <div class="page-subtitle">Choose how to answer your calls</div>
-                <div class="form-group">
-                    <label class="form-label" for="provider-mode">AI provider</label>
-                    <select id="provider-mode" .value=${this._mode} @change=${e => this._saveMode(e.target.value)}>
-                        <option value="openrouter">OpenRouter · OpenAI models</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="byok">Gemini / Groq</option>
-                        <option value="local">Local AI</option>
-                    </select>
-                </div>
-
-                ${this.errorMessage ? html`<div class="form-hint" role="alert">${this.errorMessage}</div>` : ''}
-                <div class="form-hint">Инструкции для новой сессии: ${this._instructionName}. Выбор — в AI Customization.</div>
-                <!-- Cloud mode render branch intentionally disabled. -->
-                ${this._mode === 'byok' ? this._renderByokMode() : ''} ${this._mode === 'local' ? this._renderLocalMode() : ''}
-                ${['openai', 'openrouter'].includes(this._mode) ? this._renderHostedMode() : ''}
-            </div>
-            ${this._mode === 'local' && this._showLocalHelp ? this._renderLocalHelp(closeIcon) : ''}
-        `;
+        return html`<div class="form-wrapper">
+            <div class="section-heading page-title">Новая сессия</div>
+            ${this._sharingVisible ? html`<div role="status" style="padding:10px;border:1px solid #e9ac45;border-radius:8px;color:#e9ac45">Окно видно при демонстрации экрана · <button class="text-button" @click=${() => window.cheatingDaddy.element().navigate('customize')}>Настройки</button></div>` : ''}
+            <session-console .recovery=${this.recovery} .review=${this.review} @start-session=${this._handleStart}></session-console>
+            ${
+                this.downloadProgress.active
+                    ? html`<div class="form-hint">
+                          Загрузка: ${this.downloadProgress.label || 'модели'} ${this.downloadProgress.percentage ?? ''}%
+                          <button class="text-button" @click=${() => this.onCancelDownload()}>Отмена</button>
+                      </div>`
+                    : ''
+            }
+            ${this.errorMessage || this._pageError ? html`<div class="form-hint" role="alert">${this.errorMessage || this._pageError}</div>` : ''}
+            ${this._renderContext()}
+            <section class="setup-card">
+                <label
+                    >Подключение AI<select id="provider-mode" .value=${this._mode} @change=${e => this._saveMode(e.target.value)}>
+                        <option value="openrouter">OpenRouter · API</option>
+                        <option value="openai">OpenAI · API</option>
+                        <option value="claude-code">Claude Code · мост</option>
+                        <option value="codex">ChatGPT · через Codex</option>
+                        <option value="byok">Gemini / Groq · API</option>
+                        <option value="local">Локальные модели</option>
+                    </select></label
+                >
+            </section>
+            ${['openai', 'openrouter'].includes(this._mode) ? this._renderHostedMode() : ''}
+            ${['claude-code', 'codex'].includes(this._mode) ? this._renderBridgeMode() : ''} ${this._mode === 'byok' ? this._renderByokMode() : ''}
+            ${this._mode === 'local' ? this._renderLocalMode() : ''}
+        </div>`;
     }
 
     _renderLocalHelp(closeIcon) {
@@ -1953,50 +2136,46 @@ export class MainView extends LitElement {
             <div class="help-dialog-backdrop" @click=${this._closeLocalHelp}>
                 <section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="local-help-title" @click=${this._handleHelpDialogClick}>
                     <div class="help-dialog-header">
-                        <div id="local-help-title" class="help-dialog-title">Local AI setup</div>
-                        <button class="help-btn" @click=${this._closeLocalHelp} aria-label="Close Local AI help">${closeIcon}</button>
+                        <div id="local-help-title" class="help-dialog-title">Настройка локального AI</div>
+                        <button class="help-btn" @click=${this._closeLocalHelp} aria-label="Закрыть справку">${closeIcon}</button>
                     </div>
 
                     <div class="help-content">
                         <div class="help-section">
-                            <div class="help-section-title">Native local AI</div>
+                            <div class="help-section-title">Локальный AI</div>
                             <div class="help-section-text">
-                                Cheating Daddy runs llama.cpp and whisper.cpp directly. Everything stays on your computer — no external AI service or
-                                Ollama installation is required.
+                                Cheating Daddy запускает llama.cpp и whisper.cpp на вашем компьютере. Внешний AI-сервис и установка Ollama не нужны.
                             </div>
                         </div>
 
                         <div class="help-section">
-                            <div class="help-section-title">Automatic setup</div>
+                            <div class="help-section-title">Автоматическая установка</div>
                             <div class="help-section-text">
-                                The correct native runners, selected Whisper model, and language model are downloaded and checksum-verified on first
-                                use. They are stored in the Cheating Daddy config directory.
+                                При первом запуске приложение скачает движки и выбранные модели, проверит контрольные суммы и сохранит файлы в
+                                каталоге настроек.
                             </div>
                         </div>
 
                         <div class="help-section">
-                            <div class="help-section-title">Default model</div>
+                            <div class="help-section-title">Модель по умолчанию</div>
                             <div class="help-models">
                                 <div class="help-model">
-                                    <span class="help-model-name">Qwen3.5 4B Q4_K_M</span><span>About 2.7 GB — balanced local quality and speed</span>
+                                    <span class="help-model-name">Qwen3.5 4B Q4_K_M</span><span>Около 2,7 ГБ — баланс скорости и качества</span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="help-section">
                             <div class="help-section-title">Whisper</div>
-                            <div class="help-section-text">
-                                The selected whisper.cpp model is downloaded automatically once and kept in the config directory.
-                            </div>
+                            <div class="help-section-text">Выбранная модель whisper.cpp скачивается один раз и хранится в каталоге настроек.</div>
                         </div>
 
                         <hr class="help-divider" />
 
                         <div class="help-section">
-                            <div class="help-section-title">Computer hanging or slow?</div>
+                            <div class="help-section-title">Компьютер работает медленно?</div>
                             <div class="help-section-text">
-                                Running models locally uses a lot of RAM and CPU. If your computer slows down or freezes, it's likely the LLM. Switch
-                                back to BYOK mode if you want to use a hosted provider instead.
+                                Локальные модели нагружают процессор и память. Если компьютер тормозит, выберите облачного провайдера.
                             </div>
                         </div>
 
@@ -2007,7 +2186,7 @@ export class MainView extends LitElement {
                                 this._saveMode('byok');
                             }}
                         >
-                            Switch to BYOK
+                            Перейти к Gemini / Groq
                         </button>
                     </div>
                 </section>

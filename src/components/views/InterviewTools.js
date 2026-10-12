@@ -5,6 +5,8 @@ export class InterviewTools extends LitElement {
     static properties = {
         diagramZoom: { state: true },
         preparationOnly: { type: Boolean, reflect: true },
+        libraryTab: { type: String },
+        libraryId: { state: true },
         tab: { state: true },
         collapsed: { state: true },
         selectedTopics: { state: true },
@@ -15,6 +17,8 @@ export class InterviewTools extends LitElement {
         revision: { state: true },
         status: { state: true },
         busy: { state: true },
+        autoAnswers: { state: true },
+        paused: { type: Boolean },
         workspace: { state: true },
         mode: { state: true },
         routing: { state: true },
@@ -36,7 +40,7 @@ export class InterviewTools extends LitElement {
             display: block;
             color: var(--text-primary);
             font-family: var(--font);
-            font-size: 16px;
+            font-size: 13px;
             position: relative;
             flex-shrink: 0;
         }
@@ -52,7 +56,7 @@ export class InterviewTools extends LitElement {
             background: var(--bg-elevated, #191919);
             border: 1px solid var(--border);
             border-radius: 7px;
-            padding: 7px;
+            padding: 4px 6px;
             user-select: text;
         }
         select {
@@ -87,19 +91,19 @@ export class InterviewTools extends LitElement {
         }
         .bar {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             align-items: center;
             flex-wrap: wrap;
-            padding: 6px;
+            padding: 4px;
         }
         .bar > button,
         .bar select,
         .bar summary,
         .reading-controls button {
-            min-height: 34px;
-            line-height: 18px;
-            font-size: 14px;
-            padding: 7px 9px;
+            min-height: 26px;
+            line-height: 16px;
+            font-size: 12px;
+            padding: 3px 6px;
             border: 1px solid var(--border);
             border-radius: 7px;
             background: var(--bg-elevated, #191919);
@@ -111,8 +115,8 @@ export class InterviewTools extends LitElement {
             gap: 6px;
         }
         .panel {
-            padding: 10px;
-            max-height: 55vh;
+            padding: 6px;
+            max-height: 35vh;
             position: relative;
             background: #151515;
             box-shadow: none;
@@ -126,7 +130,7 @@ export class InterviewTools extends LitElement {
         }
         textarea {
             width: 100%;
-            min-height: 72px;
+            min-height: 48px;
             resize: vertical;
         }
         label {
@@ -352,8 +356,17 @@ export class InterviewTools extends LitElement {
             border-color: var(--accent);
         }
     `;
-    updated() {
+    updated(changed) {
+        if (!this.preparationOnly && ['tab', 'collapsed', 'inbox', 'routing', 'mode', 'autoAnswers'].some(key => changed.has(key)))
+            this.dispatchEvent(new CustomEvent('session-toolbar-change', { bubbles: true, composed: true }));
         this.toggleAttribute('design-active', !this.preparationOnly && this.tab === 'design' && !this.collapsed);
+        if (changed.has('libraryTab'))
+            this.libraryId = this.workspace[this.libraryTab === 'resumes' ? 'activeResumeId' : 'activeVacancyId'] || this.libraryItems[0]?.id || '';
+        if (this.autoQueue && (changed.has('paused') || changed.has('busy'))) {
+            this.autoQueue.paused = this.paused;
+            this.autoQueue.blocked = this.busy;
+            this.autoQueue.update(this.inbox);
+        }
     }
     constructor() {
         super();
@@ -368,7 +381,22 @@ export class InterviewTools extends LitElement {
         this.revision = 0;
         this.status = '';
         this.busy = false;
-        this.workspace = { packages: [], activePackageId: '', design: {}, designVersions: [] };
+        this.autoAnswers = false;
+        this.paused = false;
+        this.manualDraftIds = new Set();
+        this.workspace = {
+            version: 2,
+            packages: [],
+            activePackageId: '',
+            resumes: [],
+            vacancies: [],
+            activeResumeId: '',
+            activeVacancyId: '',
+            design: {},
+            designVersions: [],
+        };
+        this.libraryTab = 'resumes';
+        this.libraryId = '';
         this.mode = 'answer';
         this.routing = 'auto';
         this.files = [];
@@ -394,12 +422,35 @@ export class InterviewTools extends LitElement {
     }
     connectedCallback() {
         super.connectedCallback();
+        const { AutoAnswerQueue } = window.require('./utils/interview-workflow');
+        this.autoQueue = new AutoAnswerQueue(async q => {
+            const current = this.inbox.find(item => item.id === q.id);
+            if (!current || current.revision !== q.revision || !this.autoAnswers || this.paused) return;
+            // A locally edited draft always waits for manual approval.
+            if (this.manualDraftIds.has(q.id) || (q.id === this.questionId && this.questionText !== q.text)) return;
+            const success = await this.perform(async () => {
+                this.status = '';
+                await this.ask(q.text, { questionId: q.id, revision: q.revision, routing: 'auto' });
+                this.status = '';
+            });
+            if (!success) {
+                this.autoAnswers = false;
+                this.notifyAutoAnswers();
+                this.status += ' Автоответы выключены. Можно повторить запрос вручную.';
+                throw Error(this.status);
+            }
+        });
         this.onInbox = (_, items) => {
             const old = this.inbox.find(q => q.id === this.questionId);
             this.inbox = items;
             const next = items.find(q => q.id === this.questionId);
+            if (!next) {
+                this.questionId = '';
+                this.questionText = '';
+            }
             if (old && next && this.questionText === old.text && this.revision === old.revision) this.selectQuestion(next);
             if (!this.questionId && items.length) this.selectQuestion(items[0]);
+            this.autoQueue.update(items);
         };
         this.onPaste = event => {
             const images = [...(event.clipboardData?.items || [])].filter(i => i.type.startsWith('image/'));
@@ -414,13 +465,19 @@ export class InterviewTools extends LitElement {
     }
     disconnectedCallback() {
         super.disconnectedCallback();
+        this.autoQueue?.close();
         this.ipc.removeListener('question-inbox', this.onInbox);
         this.removeEventListener('paste', this.onPaste);
     }
     async load() {
         try {
             this.workspace = (await this.call('workspace-load')).data;
+            this.libraryId =
+                this.workspace[this.libraryTab === 'resumes' ? 'activeResumeId' : 'activeVacancyId'] ||
+                this.workspace[this.libraryTab]?.[0]?.id ||
+                '';
             this.inbox = (await this.call('questions')).data;
+            this.autoQueue.update(this.inbox);
             if (this.inbox.length) this.selectQuestion(this.inbox[0]);
             this._loaded = true;
             if (this.owner._restoredTools) {
@@ -446,23 +503,48 @@ export class InterviewTools extends LitElement {
         }
     }
     async persist() {
-        await this.call('workspace-save', this.workspace);
-        this.status = 'Сохранено. Материалы вакансии применяются при следующем запуске сессии.';
+        this.workspace = (await this.call('workspace-save', this.workspace)).data;
+        this.status = 'Сохранено';
     }
-    get prep() {
-        return this.workspace.packages.find(p => p.id === this.workspace.activePackageId);
+    get libraryItems() {
+        return this.workspace[this.libraryTab] || [];
     }
-    editPrep(field, value) {
-        const p = this.prep;
-        if (p) {
-            p[field] = value;
-            this.workspace = { ...this.workspace };
-        }
+    get libraryItem() {
+        return this.libraryItems.find(item => item.id === this.libraryId);
+    }
+    editLibrary(field, value) {
+        this.workspace = {
+            ...this.workspace,
+            [this.libraryTab]: this.libraryItems.map(item => (item.id === this.libraryId ? { ...item, [field]: value } : item)),
+        };
+        this.status = 'Не сохранено';
+    }
+    async deleteLibraryItem() {
+        await this.perform(async () => {
+            const active = this.libraryTab === 'resumes' ? 'activeResumeId' : 'activeVacancyId';
+            const next = {
+                ...this.workspace,
+                [this.libraryTab]: this.libraryItems.filter(item => item.id !== this.libraryId),
+                [active]: this.workspace[active] === this.libraryId ? '' : this.workspace[active],
+            };
+            this.workspace = (await this.call('workspace-save', next)).data;
+            this.libraryId = this.libraryItems[0]?.id || '';
+            this.status = 'Удалено';
+        });
     }
     selectQuestion(q) {
         this.questionId = q.id;
         this.questionText = q.text;
         this.revision = q.revision;
+    }
+    notifyAutoAnswers() {
+        this.dispatchEvent(new CustomEvent('auto-answers-change', { detail: this.autoAnswers, bubbles: true, composed: true }));
+    }
+    toggleAutoAnswers() {
+        this.autoAnswers = !this.autoAnswers;
+        this.autoQueue.setEnabled(this.autoAnswers);
+        this.status = '';
+        this.notifyAutoAnswers();
     }
     restoreDraft(snapshot) {
         if (snapshot.toolState)
@@ -471,6 +553,7 @@ export class InterviewTools extends LitElement {
         this.questionId = snapshot.questionId;
         this.questionText = snapshot.questionText;
         this.revision = snapshot.questionRevision;
+        if (this.questionId && this.questionText !== this.inbox.find(q => q.id === this.questionId)?.text) this.manualDraftIds.add(this.questionId);
         this.notifyAttachments();
     }
     async retry(requestId) {
@@ -525,7 +608,6 @@ export class InterviewTools extends LitElement {
     async sendQuestion() {
         await this.perform(async () => {
             const sentId = this.questionId;
-            this.tab = '';
             await this.ask(this.questionText, { questionId: sentId, revision: this.revision });
             if (this.questionId === sentId) {
                 this.questionId = '';
@@ -582,8 +664,8 @@ export class InterviewTools extends LitElement {
         });
     }
     async importFile(file) {
+        const libraryTab = this.libraryTab;
         await this.perform(async () => {
-            if (!this.prep) throw new Error('Сначала создайте вакансию');
             if (file.size > 10 * 1024 * 1024) throw new Error('Файл до 10 МБ');
             const reader = new FileReader();
             const data = await new Promise((resolve, reject) => {
@@ -592,9 +674,12 @@ export class InterviewTools extends LitElement {
                 reader.readAsDataURL(file);
             });
             const material = (await this.call('import', { name: file.name, data })).data;
-            this.prep.materials = [...this.prep.materials, material];
-            this.workspace = { ...this.workspace };
-            await this.persist();
+            const item = { ...material, id: crypto.randomUUID() };
+            const active = libraryTab === 'resumes' ? 'activeResumeId' : 'activeVacancyId';
+            const next = { ...this.workspace, [libraryTab]: [...this.workspace[libraryTab], item], [active]: item.id };
+            this.workspace = (await this.call('workspace-save', next)).data;
+            if (this.libraryTab === libraryTab) this.libraryId = item.id;
+            this.status = 'Добавлено';
         });
     }
     async updateDesign() {
@@ -756,88 +841,151 @@ export class InterviewTools extends LitElement {
         this.workspace = { ...this.workspace, design: { ...this.workspace.design, [key]: value } };
     }
     renderPreparation() {
+        const item = this.libraryItem;
+        const resume = this.libraryTab === 'resumes';
+        const active = resume ? 'activeResumeId' : 'activeVacancyId';
         return html`<div class="prep-content">
-            <h2>Preparation</h2>
             <div class="bar">
                 <select
-                    .value=${this.workspace.activePackageId}
+                    aria-label=${resume ? 'Резюме' : 'Вакансия'}
+                    .value=${this.libraryId}
                     @change=${e => {
-                        this.workspace = { ...this.workspace, activePackageId: e.target.value };
+                        this.libraryId = e.target.value;
+                        this.status = '';
                     }}
                 >
-                    <option value="">Без пакета</option>
-                    ${this.workspace.packages.map(p => html`<option value=${p.id} ?selected=${p.id === this.workspace.activePackageId}>${p.name}</option>`)}</select
-                ><button
+                    <option value="">Выбрать ${resume ? 'резюме' : 'вакансию'}</option>
+                    ${this.libraryItems.map(p => html`<option value=${p.id} ?selected=${p.id === this.libraryId}>${p.name}${p.id === this.workspace[active] ? ' ✓' : ''}</option>`)}
+                </select>
+                <button
+                    ?disabled=${this.busy}
                     @click=${() => {
-                        const p = { id: crypto.randomUUID(), name: 'Новая вакансия', vacancy: '', experience: '', materials: [] };
-                        this.workspace = { ...this.workspace, packages: [...this.workspace.packages, p], activePackageId: p.id };
+                        const p = { id: crypto.randomUUID(), name: resume ? 'Новое резюме' : 'Новая вакансия', text: '' };
+                        this.workspace = { ...this.workspace, [this.libraryTab]: [...this.libraryItems, p] };
+                        this.libraryId = p.id;
+                        this.status = 'Не сохранено';
                     }}
                 >
-                    + Вакансия</button
-                ><button ?disabled=${this.busy} @click=${() => this.perform(() => this.persist())}>Сохранить</button>
+                    + Создать
+                </button>
+                <label style="margin:0"
+                    ><input
+                        type="file"
+                        hidden
+                        accept=".pdf,.docx,.txt,.md,.json,.csv"
+                        ?disabled=${this.busy}
+                        @change=${e => {
+                            const f = e.target.files[0];
+                            if (f) this.importFile(f);
+                            e.target.value = '';
+                        }}
+                    />
+                    <button ?disabled=${this.busy} @click=${e => e.target.parentElement.querySelector('input').click()}>Загрузить файл</button>
+                </label>
             </div>
             ${
-                this.prep
-                    ? html`<label>Название вакансии<input .value=${this.prep.name} @input=${e => this.editPrep('name', e.target.value)} /></label>
-                          <div class="grid">
-                              <label
-                                  >Описание вакансии<textarea
-                                      .value=${this.prep.vacancy}
-                                      @input=${e => this.editPrep('vacancy', e.target.value)}
-                                  ></textarea></label
-                              ><label
-                                  >Реальные истории и достижения<textarea
-                                      .value=${this.prep.experience}
-                                      @input=${e => this.editPrep('experience', e.target.value)}
-                                  ></textarea>
-                              </label>
-                          </div>
-                          <label
-                              >Резюме и материалы: PDF, DOCX, TXT, MD (до 10 МБ)<input
-                                  type="file"
-                                  accept=".pdf,.docx,.txt,.md,.json,.csv"
+                item
+                    ? html`<label
+                              >Название<input maxlength="200" .value=${item.name} @input=${e => this.editLibrary('name', e.target.value)}
+                          /></label>
+                          <textarea
+                              style="min-height:220px"
+                              aria-label=${resume ? 'Текст резюме' : 'Описание вакансии'}
+                              .value=${item.text}
+                              @input=${e => this.editLibrary('text', e.target.value)}
+                          ></textarea>
+                          <div class="bar">
+                              <button ?disabled=${this.busy} @click=${() => this.perform(() => this.persist())}>Сохранить</button>
+                              <button
                                   ?disabled=${this.busy}
-                                  @change=${e => {
-                                      const f = e.target.files[0];
-                                      if (f) this.importFile(f);
-                                      e.target.value = '';
-                                  }} /></label
-                          >${this.prep.materials.map(
-                              (m, i) =>
-                                  html`<details>
-                                      <summary>${m.name} · ${m.text.length} символов</summary>
-                                      <textarea
-                                          .value=${m.text}
-                                          @input=${e => {
-                                              m.text = e.target.value;
-                                          }}
-                                      ></textarea
-                                      ><button
-                                          @click=${() => {
-                                              this.prep.materials = this.prep.materials.filter((_, n) => n !== i);
-                                              this.workspace = { ...this.workspace };
-                                          }}
-                                      >
-                                          Убрать документ
-                                      </button>
-                                  </details>`
-                          )}<button
-                              @click=${() => {
-                                  this.workspace = {
-                                      ...this.workspace,
-                                      packages: this.workspace.packages.filter(p => p.id !== this.prep.id),
-                                      activePackageId: '',
-                                  };
-                              }}
-                          >
-                              Удалить пакет (затем сохранить)
-                          </button>`
+                                  @click=${() =>
+                                      this.perform(async () => {
+                                          this.workspace = { ...this.workspace, [active]: item.id };
+                                          await this.persist();
+                                      })}
+                              >
+                                  Сохранить и выбрать
+                              </button>
+                              <button ?disabled=${this.busy} @click=${this.deleteLibraryItem}>Удалить</button>
+                          </div>`
                     : ''
             }
-            <p class="muted">
-                Документы хранятся локально. При запросе выбранному AI отправляются подходящие фрагменты. Проверьте распознанный текст. Неуказанные
-                факты AI должен обозначать как отсутствующие.
-            </p>
+        </div>`;
+    }
+    renderToolbar() {
+        return html`<div class="bar">
+            ${[
+                ['questions', 'Реплики · ' + this.inbox.length],
+                ['topics', 'Темы'],
+            ].map(
+                ([id, label]) =>
+                    html`<button
+                        class=${this.tab === id ? 'active' : ''}
+                        @click=${() => {
+                            if (this.tab === id) this.collapsed = !this.collapsed;
+                            else {
+                                this.tab = id;
+                                this.collapsed = false;
+                            }
+                        }}
+                    >
+                        ${label}
+                    </button>`
+            )}<select
+                aria-label="Инструменты"
+                .value=${['code', 'design'].includes(this.tab) ? this.tab : ''}
+                @change=${e => {
+                    this.tab = e.target.value;
+                    this.collapsed = false;
+                }}
+            >
+                <option value="">Инструменты</option>
+                <option value="code">Проверка кода</option>
+                <option value="design">System design</option>
+            </select>
+            <select aria-label="Тема ответа" .value=${this.routing} @change=${e => (this.routing = e.target.value)}>
+                <option value="auto">Определить тему</option>
+                <option value="current">Текущая тема</option>
+                <option value="new">Новая тема</option>
+            </select>
+            <select aria-label="Формат ответа" .value=${this.mode} @change=${e => (this.mode = e.target.value)}>
+                <option value="answer">Ответ</option>
+                <option value="technical">Задача</option>
+            </select>
+            <span class="reading-controls"
+                ><button
+                    title="Уменьшить шрифт"
+                    @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: -2, bubbles: true, composed: true }))}
+                >
+                    A−</button
+                ><button
+                    title="Увеличить шрифт"
+                    @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: 2, bubbles: true, composed: true }))}
+                >
+                    A+
+                </button></span
+            >
+            <button
+                title=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
+                aria-label=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
+                aria-expanded=${!this.collapsed}
+                ?disabled=${!this.tab}
+                @click=${() => {
+                    this.collapsed = !this.collapsed;
+                }}
+                style="width:26px;height:26px;padding:4px;display:grid;place-items:center"
+            >
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                        d=${this.collapsed ? 'M3 6l5 5 5-5' : 'M3 10l5-5 5 5'}
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    />
+                </svg>
+            </button>
         </div>`;
     }
     render() {
@@ -847,112 +995,46 @@ export class InterviewTools extends LitElement {
         const splitOptions =
             selectedTopics.length === 1 ? [...(owner._inlineRequests?.entries() || [])].filter(([, r]) => r.index === selectedTopics[0]) : [];
         return html` ${
-            !this.preparationOnly
-                ? html`<div class="bar">
-                      ${[
-                          ['questions', 'Вопросы ' + this.inbox.length],
-                          ['topics', 'Темы'],
-                      ].map(
-                          ([id, label]) =>
-                              html`<button
-                                  class=${this.tab === id ? 'active' : ''}
-                                  @click=${() => {
-                                      if (this.tab === id) this.collapsed = !this.collapsed;
-                                      else {
-                                          this.tab = id;
-                                          this.collapsed = false;
-                                      }
-                                  }}
-                              >
-                                  ${label}
-                              </button>`
-                      )}<select
-                          aria-label="Инструменты"
-                          .value=${['code', 'design', 'prep'].includes(this.tab) ? this.tab : ''}
-                          @change=${e => {
-                              this.tab = e.target.value;
-                              this.collapsed = false;
-                          }}
-                      >
-                          <option value="">Инструменты</option>
-                          <option value="code">Проверка кода</option>
-                          <option value="design">System design</option>
-                          <option value="prep">Вакансия</option>
-                      </select>
-                      <select aria-label="Тема ответа" .value=${this.routing} @change=${e => (this.routing = e.target.value)}>
-                          <option value="auto">Определить тему</option>
-                          <option value="current">Текущая тема</option>
-                          <option value="new">Новая тема</option>
-                      </select>
-                      <select aria-label="Формат ответа" .value=${this.mode} @change=${e => (this.mode = e.target.value)}>
-                          <option value="answer">Ответ</option>
-                          <option value="technical">Задача</option>
-                      </select>
-                      <span class="reading-controls"
-                          ><button
-                              title="Уменьшить шрифт"
-                              @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: -2, bubbles: true, composed: true }))}
-                          >
-                              A−</button
-                          ><button
-                              title="Увеличить шрифт"
-                              @click=${() => this.dispatchEvent(new CustomEvent('font-step', { detail: 2, bubbles: true, composed: true }))}
-                          >
-                              A+
-                          </button></span
-                      >
-                      <button
-                          title=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
-                          aria-label=${this.collapsed ? 'Развернуть панель' : 'Свернуть панель'}
-                          aria-expanded=${!this.collapsed}
-                          ?disabled=${!this.tab}
-                          @click=${() => {
-                              this.collapsed = !this.collapsed;
-                          }}
-                          style="width:32px;height:32px;padding:4px;display:grid;place-items:center"
-                      >
-                          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                              <path
-                                  d=${this.collapsed ? 'M3 6l5 5 5-5' : 'M3 10l5-5 5 5'}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                              />
-                          </svg>
-                      </button>
-                  </div>`
-                : ''
-        }
-        ${
             (!this.collapsed && this.tab && (this.tab !== 'questions' || selected)) || this.preparationOnly
                 ? html`<div class="panel">
                       ${this.preparationOnly || this.tab === 'prep' ? this.renderPreparation() : ''}
                       ${
                           !this.preparationOnly && this.tab === 'questions'
-                              ? html`${this.inbox.map(q => html`<button class=${q.id === this.questionId ? 'active' : ''} @click=${() => this.selectQuestion(q)}>${q.text.slice(0, 85)}</button>`)}${
-                                    selected
-                                        ? html`<textarea .value=${this.questionText} @input=${e => (this.questionText = e.target.value)}></textarea
-                                              >${selected.revision !== this.revision ? html`<button @click=${() => this.selectQuestion(selected)}>Получено дополнение — загрузить новую версию</button>` : ''}<button
-                                                  ?disabled=${this.busy || selected.revision !== this.revision}
-                                                  @click=${this.sendQuestion}
-                                              >
-                                                  Ответить на вопрос</button
-                                              ><button
-                                                  ?disabled=${this.busy}
-                                                  @click=${() =>
-                                                      this.perform(async () => {
-                                                          await this.call('discard-question', { id: selected.id, revision: selected.revision });
-                                                          this.questionId = '';
-                                                          this.questionText = '';
-                                                          this.status = 'Вопрос удалён';
-                                                      })}
-                                              >
-                                                  Пропустить
-                                              </button>`
-                                        : ''
-                                } `
+                              ? html`
+                                    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">
+                                        ${this.inbox.map((q, i) => html`<button style="flex-shrink:0;max-width:260px;text-align:left" title=${q.text} class=${q.id === this.questionId ? 'active' : ''} @click=${() => this.selectQuestion(q)}>${i + 1}. ${q.text.slice(0, 85)}${q.text.length > 85 ? '…' : ''}</button>`)}
+                                    </div>
+                                    ${
+                                        selected
+                                            ? html`<textarea
+                                                      aria-label="Реплика собеседника"
+                                                      id="heard-question"
+                                                      .value=${this.questionText}
+                                                      @input=${e => {
+                                                          this.questionText = e.target.value;
+                                                          this.manualDraftIds.add(this.questionId);
+                                                      }}
+                                                  ></textarea
+                                                  >${selected.revision !== this.revision ? html`<button @click=${() => this.selectQuestion(selected)}>Обновить реплику</button>` : ''}<button
+                                                      ?disabled=${this.busy || selected.revision !== this.revision}
+                                                      @click=${this.sendQuestion}
+                                                  >
+                                                      Ответить</button
+                                                  ><button
+                                                      ?disabled=${this.busy}
+                                                      @click=${() =>
+                                                          this.perform(async () => {
+                                                              await this.call('discard-question', { id: selected.id, revision: selected.revision });
+                                                              this.questionId = '';
+                                                              this.questionText = '';
+                                                              this.status = 'Вопрос удалён';
+                                                          })}
+                                                  >
+                                                      Удалить
+                                                  </button>`
+                                            : ''
+                                    }
+                                `
                               : ''
                       }
                       ${
