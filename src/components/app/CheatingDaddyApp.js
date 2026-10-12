@@ -1476,26 +1476,23 @@ export class CheatingDaddyApp extends LitElement {
                         ${this.shadowRoot.querySelector('assistant-view')?.shadowRoot.querySelector('interview-tools')?.renderToolbar() || ''}
                     </div>
                     ${this._opacityHint ? html`<span class="live-bar-text">Видимость ${this._opacityHint}%</span>` : ''}
-                    ${
-                        waiting > 0
-                            ? html`<button class="live-chip accent" title=${`Следующий ответ (${window.cheatingDaddy.modKey}+])`} @click=${showNext}>
-                                  Ждут ответы · ${waiting}
-                              </button>`
-                            : ''
-                    }
+                    ${waiting > 0
+                        ? html`<button class="live-chip accent" title=${`Следующий ответ (${window.cheatingDaddy.modKey}+])`} @click=${showNext}>
+                              Ждут ответы · ${waiting}
+                          </button>`
+                        : ''}
                     ${this._isClickThrough ? html`<span class="live-chip warning" title="Клики проходят сквозь окно">Сквозные клики</span>` : ''}
-                    ${
-                        this.hostedMode
-                            ? html`<button
-                                  class="live-chip ${this.autoAnswers ? 'accent' : ''}"
-                                  aria-pressed=${this.autoAnswers}
-                                  title="Автоматические ответы на новые вопросы"
-                                  @click=${() => this.shadowRoot.querySelector('assistant-view')?.shadowRoot.querySelector('interview-tools')?.toggleAutoAnswers()}
-                              >
-                                  Автоответы: ${this.autoAnswers ? 'вкл' : 'выкл'}
-                              </button>`
-                            : ''
-                    }
+                    ${this.hostedMode
+                        ? html`<button
+                              class="live-chip ${this.autoAnswers ? 'accent' : ''}"
+                              aria-pressed=${this.autoAnswers}
+                              title="Автоматические ответы на новые вопросы"
+                              @click=${() =>
+                                  this.shadowRoot.querySelector('assistant-view')?.shadowRoot.querySelector('interview-tools')?.toggleAutoAnswers()}
+                          >
+                              Автоответы: ${this.autoAnswers ? 'вкл' : 'выкл'}
+                          </button>`
+                        : ''}
                     ${this.statusText ? html`<span class="live-bar-text status" title=${this.statusText}>${this.statusText}</span>` : ''}
                     <button
                         class="live-chip"

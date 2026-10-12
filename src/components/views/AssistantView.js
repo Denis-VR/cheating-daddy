@@ -1359,237 +1359,234 @@ export class AssistantView extends LitElement {
         return html`
             <div
                 class="focus-toolbar"
-                style=${this.hostedMode && !this.focusMode ? 'display:none' : 'display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px;flex-shrink:0'}
+                style=${this.hostedMode && !this.focusMode
+                    ? 'display:none'
+                    : 'display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px;flex-shrink:0'}
             >
-                ${
-                    this.focusMode
-                        ? html`<button class="analyze-btn" @click=${() => this.changeFontSize(-2)}>A−</button>
-                              <button
-                                  class="analyze-btn"
-                                  title=${`Вернуть панели (${window.cheatingDaddy.modKey}+Shift+F)`}
-                                  @click=${() => {
-                                      owner.focusMode = !owner.focusMode;
-                                  }}
-                              >
-                                  Вернуть панели</button
-                              ><button class="analyze-btn" @click=${() => this.changeFontSize(2)}>A+</button
-                              ><button class="analyze-btn" title="Завершить сессию" @click=${() => owner.endSession()}>⏹</button>`
-                        : ''
-                }
+                ${this.focusMode
+                    ? html`<button class="analyze-btn" @click=${() => this.changeFontSize(-2)}>A−</button>
+                          <button
+                              class="analyze-btn"
+                              title=${`Вернуть панели (${window.cheatingDaddy.modKey}+Shift+F)`}
+                              @click=${() => {
+                                  owner.focusMode = !owner.focusMode;
+                              }}
+                          >
+                              Вернуть панели</button
+                          ><button class="analyze-btn" @click=${() => this.changeFontSize(2)}>A+</button
+                          ><button class="analyze-btn" title="Завершить сессию" @click=${() => owner.endSession()}>⏹</button>`
+                    : ''}
             </div>
-            ${failures.map(([id, r]) => html`<div style="padding:6px 12px;font-size:14px">${r.question.slice(0, 80)}: ${r.error}<button class="analyze-btn" @click=${() => this.shadowRoot.querySelector('interview-tools').retry(id)}>Повторить запрос</button></div>`)}
+            ${failures.map(
+                ([id, r]) =>
+                    html`<div style="padding:6px 12px;font-size:14px">
+                        ${r.question.slice(0, 80)}: ${r.error}<button
+                            class="analyze-btn"
+                            @click=${() => this.shadowRoot.querySelector('interview-tools').retry(id)}
+                        >
+                            Повторить запрос
+                        </button>
+                    </div>`
+            )}
             <link rel="stylesheet" href="assets/highlight-vscode-dark.min.css" />
-            ${
-                this.hostedMode
-                    ? html`<interview-tools
-                          .paused=${this.paused}
-                          style=${this.focusMode ? 'display:none' : ''}
-                          @font-step=${e => this.changeFontSize(e.detail)}
-                          @focus-toggle=${() => {
-                              owner.focusMode = !owner.focusMode;
-                          }}
-                          @attachments-change=${e => {
-                              this.attachments = [...e.detail];
-                          }}
-                          .revisionTick=${this.manualRequestRevision + this.responses.length + this.currentResponseIndex / 1000}
-                          .paused=${this.paused}
-                      ></interview-tools>`
-                    : ''
-            }
+            ${this.hostedMode
+                ? html`<interview-tools
+                      .paused=${this.paused}
+                      style=${this.focusMode ? 'display:none' : ''}
+                      @font-step=${e => this.changeFontSize(e.detail)}
+                      @focus-toggle=${() => {
+                          owner.focusMode = !owner.focusMode;
+                      }}
+                      @attachments-change=${e => {
+                          this.attachments = [...e.detail];
+                      }}
+                      .revisionTick=${this.manualRequestRevision + this.responses.length + this.currentResponseIndex / 1000}
+                      .paused=${this.paused}
+                  ></interview-tools>`
+                : ''}
             ${this.renderTranscript()}
             <div class="response-container" id="responseContainer" @click=${this.handleResponseClick}></div>
 
-            ${
-                (visible.length > 0 || this.hostedMode) && !this.responseControlsHidden
-                    ? html`
-                          <div class="response-nav">
-                              <div class="tp-controls">
-                                  <button
-                                      class="nav-text-btn ${this.teleprompterOn ? 'on' : ''}"
-                                      aria-pressed=${this.teleprompterOn}
-                                      title=${`Автопрокрутка ответа (${window.cheatingDaddy.modKey}+Alt+S)`}
-                                      @click=${this.toggleTeleprompter}
-                                  >
-                                      ${this.teleprompterOn ? '❚❚ Суфлёр' : '▶ Суфлёр'}
-                                  </button>
-                                  <button
-                                      class="nav-text-btn"
-                                      title="Медленнее"
-                                      aria-label="Медленнее"
-                                      @click=${() => this.changeTeleprompterSpeed(-1)}
-                                  >
-                                      −
-                                  </button>
-                                  <span class="tp-speed" title="Скорость, пикселей в секунду">${this.teleprompterSpeed}</span>
-                                  <button class="nav-text-btn" title="Быстрее" aria-label="Быстрее" @click=${() => this.changeTeleprompterSpeed(1)}>
-                                      +
-                                  </button>
-                                  ${
-                                      this.hostedMode || this.transcript?.length
-                                          ? html`<button
-                                                class="nav-text-btn ${this.showTranscript ? 'on' : ''}"
-                                                aria-pressed=${this.showTranscript}
-                                                title=${this.showTranscript ? 'Скрыть ленту речи' : 'Показать ленту речи'}
-                                                @click=${() => this.setShowTranscript(!this.showTranscript)}
-                                            >
-                                                Речь
-                                            </button>`
-                                          : ''
-                                  }
-                                  ${
-                                      this.hostedMode
-                                          ? html`<div class="quick-followups" role="group" aria-label="Уточнить ответ">
-                                                ${this.quickActions.map(
-                                                    action =>
-                                                        html`<button
-                                                            class="analyze-btn"
-                                                            ?disabled=${this.isAnalyzing || this.currentResponseIndex < 0 || !this.getCurrentResponse()?.trim()}
-                                                            @click=${() => this.handleQuickFollowup(action.prompt)}
-                                                        >
-                                                            ${action.label}
-                                                        </button>`
-                                                )}
-                                                <button
-                                                    class="analyze-btn"
-                                                    title="Изменить быстрые действия"
-                                                    aria-label="Изменить быстрые действия"
-                                                    @click=${() => {
-                                                        this.actionError = '';
-                                                        this.actionDraft = this.quickActions.map(a => ({ ...a }));
-                                                    }}
-                                                >
-                                                    ✎
-                                                </button>
-                                            </div>`
-                                          : ''
-                                  }
-                              </div>
-                              ${
-                                  hasMultipleResponses
-                                      ? html`<button
-                                                class="nav-btn"
-                                                @click=${this.navigateToPreviousResponse}
-                                                ?disabled=${position <= 0}
-                                                title="Предыдущий ответ"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path
-                                                        fill-rule="evenodd"
-                                                        d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
-                                                        clip-rule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            <span class="response-counter">${position + 1} / ${visible.length}</span>
-                                            <button
-                                                class="nav-btn"
-                                                @click=${this.navigateToNextResponse}
-                                                ?disabled=${position >= visible.length - 1}
-                                                title="Следующий ответ"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path
-                                                        fill-rule="evenodd"
-                                                        d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
-                                                        clip-rule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>`
-                                      : ''
-                              }
+            ${(visible.length > 0 || this.hostedMode) && !this.responseControlsHidden
+                ? html`
+                      <div class="response-nav">
+                          <div class="tp-controls">
                               <button
-                                  class="copy-answer ${this.answerCopied ? 'copied' : ''}"
-                                  title="Копировать ответ"
-                                  @click=${this.copyCurrentAnswer}
+                                  class="nav-text-btn ${this.teleprompterOn ? 'on' : ''}"
+                                  aria-pressed=${this.teleprompterOn}
+                                  title=${`Автопрокрутка ответа (${window.cheatingDaddy.modKey}+Alt+S)`}
+                                  @click=${this.toggleTeleprompter}
                               >
-                                  ${this.answerCopied ? 'Скопировано' : 'Копировать ответ'}
+                                  ${this.teleprompterOn ? '❚❚ Суфлёр' : '▶ Суфлёр'}
                               </button>
+                              <button class="nav-text-btn" title="Медленнее" aria-label="Медленнее" @click=${() => this.changeTeleprompterSpeed(-1)}>
+                                  −
+                              </button>
+                              <span class="tp-speed" title="Скорость, пикселей в секунду">${this.teleprompterSpeed}</span>
+                              <button class="nav-text-btn" title="Быстрее" aria-label="Быстрее" @click=${() => this.changeTeleprompterSpeed(1)}>
+                                  +
+                              </button>
+                              ${this.hostedMode || this.transcript?.length
+                                  ? html`<button
+                                        class="nav-text-btn ${this.showTranscript ? 'on' : ''}"
+                                        aria-pressed=${this.showTranscript}
+                                        title=${this.showTranscript ? 'Скрыть ленту речи' : 'Показать ленту речи'}
+                                        @click=${() => this.setShowTranscript(!this.showTranscript)}
+                                    >
+                                        Речь
+                                    </button>`
+                                  : ''}
+                              ${this.hostedMode
+                                  ? html`<div class="quick-followups" role="group" aria-label="Уточнить ответ">
+                                        ${this.quickActions.map(
+                                            action =>
+                                                html`<button
+                                                    class="analyze-btn"
+                                                    ?disabled=${this.isAnalyzing ||
+                                                    this.currentResponseIndex < 0 ||
+                                                    !this.getCurrentResponse()?.trim()}
+                                                    @click=${() => this.handleQuickFollowup(action.prompt)}
+                                                >
+                                                    ${action.label}
+                                                </button>`
+                                        )}
+                                        <button
+                                            class="analyze-btn"
+                                            title="Изменить быстрые действия"
+                                            aria-label="Изменить быстрые действия"
+                                            @click=${() => {
+                                                this.actionError = '';
+                                                this.actionDraft = this.quickActions.map(a => ({ ...a }));
+                                            }}
+                                        >
+                                            ✎
+                                        </button>
+                                    </div>`
+                                  : ''}
                           </div>
-                      `
-                    : ''
-            }
+                          ${hasMultipleResponses
+                              ? html`<button
+                                        class="nav-btn"
+                                        @click=${this.navigateToPreviousResponse}
+                                        ?disabled=${position <= 0}
+                                        title="Предыдущий ответ"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path
+                                                fill-rule="evenodd"
+                                                d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
+                                                clip-rule="evenodd"
+                                            />
+                                        </svg>
+                                    </button>
+                                    <span class="response-counter">${position + 1} / ${visible.length}</span>
+                                    <button
+                                        class="nav-btn"
+                                        @click=${this.navigateToNextResponse}
+                                        ?disabled=${position >= visible.length - 1}
+                                        title="Следующий ответ"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path
+                                                fill-rule="evenodd"
+                                                d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
+                                                clip-rule="evenodd"
+                                            />
+                                        </svg>
+                                    </button>`
+                              : ''}
+                          <button class="copy-answer ${this.answerCopied ? 'copied' : ''}" title="Копировать ответ" @click=${this.copyCurrentAnswer}>
+                              ${this.answerCopied ? 'Скопировано' : 'Копировать ответ'}
+                          </button>
+                      </div>
+                  `
+                : ''}
 
             <div class="response-nav" style="display:none">
                 <button class="analyze-btn" @click=${() => window.cheatingDaddy.element().openResponseCard()}>+ Новое окно ответа</button>
-                ${
-                    this.pendingImage
-                        ? html`<span>📎 ${this.pendingImage.name || 'Скриншот'} — добавьте задание ниже</span>
-                              <button
-                                  class="analyze-btn"
-                                  ?disabled=${this.isAnalyzing}
-                                  @click=${() => {
-                                      this.pendingImage = null;
-                                  }}
-                              >
-                                  Убрать
-                              </button>`
-                        : ''
-                }
-            </div>
-            ${
-                (this.attachments || []).length
-                    ? html`<div class="attachments">
-                          ${this.attachments.map((f, i) => html`<div class="attachment"><img src=${f.url} alt=${f.name} /><button title="Убрать скриншот" @click=${() => this.shadowRoot.querySelector('interview-tools').removeAttachment(i)}>×</button></div>`)}<select
-                              aria-label="Обработка скриншота"
-                              @change=${e => {
-                                  this.shadowRoot.querySelector('interview-tools').imageMode = e.target.value;
+                ${this.pendingImage
+                    ? html`<span>📎 ${this.pendingImage.name || 'Скриншот'} — добавьте задание ниже</span>
+                          <button
+                              class="analyze-btn"
+                              ?disabled=${this.isAnalyzing}
+                              @click=${() => {
+                                  this.pendingImage = null;
                               }}
                           >
-                              <option value="ocr">Распознать текст</option>
-                              <option value="vision">Анализ изображения</option>
-                          </select>
-                      </div>`
-                    : ''
-            }
-            ${
-                this.actionDraft
-                    ? html`<div class="action-editor">
-                          ${this.actionDraft.map(
-                              (action, i) =>
-                                  html`<div class="action-row">
-                                      <input
-                                          aria-label="Название действия"
-                                          placeholder="Название"
-                                          maxlength="40"
-                                          .value=${action.label}
-                                          @input=${e => {
-                                              action.label = e.target.value;
-                                          }}
-                                      />
-                                      <textarea
-                                          aria-label="Запрос действия"
-                                          placeholder="Запрос"
-                                          maxlength="3000"
-                                          .value=${action.prompt}
-                                          @input=${e => {
-                                              action.prompt = e.target.value;
-                                          }}
-                                      ></textarea>
-                                      <button
-                                          class="analyze-btn"
-                                          aria-label="Удалить действие"
-                                          ?disabled=${this.actionSaving}
-                                          @click=${() => (this.actionDraft = this.actionDraft.filter((_, index) => index !== i))}
-                                      >
-                                          ×
-                                      </button>
-                                  </div>`
-                          )}
-                          <div class="quick-followups">
-                              <button
-                                  class="analyze-btn"
-                                  ?disabled=${this.actionSaving || this.actionDraft.length >= 12}
-                                  @click=${() => (this.actionDraft = [...this.actionDraft, { label: '', prompt: '' }])}
-                              >
-                                  +
-                              </button>
-                              <button class="analyze-btn" ?disabled=${this.actionSaving} @click=${this.saveQuickActions}>Сохранить</button>
-                              <button class="analyze-btn" ?disabled=${this.actionSaving} @click=${() => (this.actionDraft = null)}>Отмена</button>
-                          </div>
-                          ${this.actionError ? html`<div role="alert">${this.actionError}</div>` : ''}
-                      </div>`
-                    : ''
-            }
+                              Убрать
+                          </button>`
+                    : ''}
+            </div>
+            ${(this.attachments || []).length
+                ? html`<div class="attachments">
+                      ${this.attachments.map(
+                          (f, i) =>
+                              html`<div class="attachment">
+                                  <img src=${f.url} alt=${f.name} /><button
+                                      title="Убрать скриншот"
+                                      @click=${() => this.shadowRoot.querySelector('interview-tools').removeAttachment(i)}
+                                  >
+                                      ×
+                                  </button>
+                              </div>`
+                      )}<select
+                          aria-label="Обработка скриншота"
+                          @change=${e => {
+                              this.shadowRoot.querySelector('interview-tools').imageMode = e.target.value;
+                          }}
+                      >
+                          <option value="ocr">Распознать текст</option>
+                          <option value="vision">Анализ изображения</option>
+                      </select>
+                  </div>`
+                : ''}
+            ${this.actionDraft
+                ? html`<div class="action-editor">
+                      ${this.actionDraft.map(
+                          (action, i) =>
+                              html`<div class="action-row">
+                                  <input
+                                      aria-label="Название действия"
+                                      placeholder="Название"
+                                      maxlength="40"
+                                      .value=${action.label}
+                                      @input=${e => {
+                                          action.label = e.target.value;
+                                      }}
+                                  />
+                                  <textarea
+                                      aria-label="Запрос действия"
+                                      placeholder="Запрос"
+                                      maxlength="3000"
+                                      .value=${action.prompt}
+                                      @input=${e => {
+                                          action.prompt = e.target.value;
+                                      }}
+                                  ></textarea>
+                                  <button
+                                      class="analyze-btn"
+                                      aria-label="Удалить действие"
+                                      ?disabled=${this.actionSaving}
+                                      @click=${() => (this.actionDraft = this.actionDraft.filter((_, index) => index !== i))}
+                                  >
+                                      ×
+                                  </button>
+                              </div>`
+                      )}
+                      <div class="quick-followups">
+                          <button
+                              class="analyze-btn"
+                              ?disabled=${this.actionSaving || this.actionDraft.length >= 12}
+                              @click=${() => (this.actionDraft = [...this.actionDraft, { label: '', prompt: '' }])}
+                          >
+                              +
+                          </button>
+                          <button class="analyze-btn" ?disabled=${this.actionSaving} @click=${this.saveQuickActions}>Сохранить</button>
+                          <button class="analyze-btn" ?disabled=${this.actionSaving} @click=${() => (this.actionDraft = null)}>Отмена</button>
+                      </div>
+                      ${this.actionError ? html`<div role="alert">${this.actionError}</div>` : ''}
+                  </div>`
+                : ''}
             <div class="input-bar">
                 <div class="input-bar-inner">
                     <input
@@ -1615,7 +1612,9 @@ export class AssistantView extends LitElement {
                 <button
                     class="analyze-btn"
                     aria-label=${this.responseControlsHidden ? 'Показать панель ответа' : 'Скрыть панель ответа'}
-                    title=${this.responseControlsHidden ? 'Показать суфлёр, быстрые действия и копирование' : 'Скрыть суфлёр, быстрые действия и копирование'}
+                    title=${this.responseControlsHidden
+                        ? 'Показать суфлёр, быстрые действия и копирование'
+                        : 'Скрыть суфлёр, быстрые действия и копирование'}
                     aria-expanded=${!this.responseControlsHidden}
                     @click=${() => {
                         this.responseControlsHidden = !this.responseControlsHidden;
