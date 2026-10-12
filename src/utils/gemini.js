@@ -1139,6 +1139,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 ]);
                 while (session.history.length > 2 && JSON.stringify(session.history).length > 60000) session.history.splice(0, 2);
             } else initializeNewSession(profile, customPrompt);
+            const transcriptSessionId = currentSessionId;
+            session.saveTranscript = line => require('../storage').appendTranscript(transcriptSessionId, line);
             sendToRenderer('update-status', 'Listening...');
             return { success: true, sessionId: currentSessionId };
         } catch (error) {
@@ -1178,6 +1180,40 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle(
         'interview:questions',
         guarded(() => ({ success: true, data: hostedSession?.questions.items || [] }))
+    );
+    ipcMain.handle(
+        'interview:record-transcript',
+        guarded(value => {
+            if (!hostedSession || hostedSession.closed) throw Error('Запустите сессию AI');
+            if (typeof value?.enabled !== 'boolean') throw Error('Invalid recording preference');
+            hostedSession.recordTranscript = value.enabled;
+            return { success: true, enabled: value.enabled };
+        })
+    );
+    ipcMain.handle(
+        'interview:split-question',
+        guarded(value => {
+            if (!hostedSession || hostedSession.closed) throw Error('Запустите сессию AI');
+            if (typeof value?.id !== 'string' || !Number.isInteger(value.revision) || !Number.isInteger(value.segmentIndex))
+                throw Error('Invalid question boundary');
+            hostedSession.questions.split(value.id, value.revision, value.segmentIndex);
+            return { success: true };
+        })
+    );
+    ipcMain.handle(
+        'interview:merge-questions',
+        guarded(value => {
+            if (!hostedSession || hostedSession.closed) throw Error('Запустите сессию AI');
+            if (
+                typeof value?.id !== 'string' ||
+                typeof value.nextId !== 'string' ||
+                !Number.isInteger(value.revision) ||
+                !Number.isInteger(value.nextRevision)
+            )
+                throw Error('Invalid question selection');
+            hostedSession.questions.merge(value.id, value.revision, value.nextId, value.nextRevision);
+            return { success: true };
+        })
     );
     ipcMain.handle(
         'interview:discard-question',

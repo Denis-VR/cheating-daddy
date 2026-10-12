@@ -392,7 +392,9 @@ export class HistoryView extends LitElement {
     renderDebriefMarkdown(text) {
         try {
             const rendered = window.marked ? window.marked.parse(text) : text;
-            return window.require('dompurify')(window).sanitize(rendered, { USE_PROFILES: { html: true }, FORBID_TAGS: ['img', 'style', 'form', 'input', 'button'] });
+            return window
+                .require('dompurify')(window)
+                .sanitize(rendered, { USE_PROFILES: { html: true }, FORBID_TAGS: ['img', 'style', 'form', 'input', 'button'] });
         } catch (_) {
             return '';
         }
@@ -410,7 +412,10 @@ export class HistoryView extends LitElement {
                 this.debrief
                     ? html`<small>${new Date(this.debrief.createdAt).toLocaleString()} · ${this.debrief.model}</small>
                           <div class="debrief-body" .innerHTML=${this.renderDebriefMarkdown(this.debrief.text)}></div>`
-                    : html`<p>Модель соберёт вопросы интервьюера, отметит трудные темы и составит план, что подтянуть. Запрос оплачивается через API провайдера.</p>`
+                    : html`<p>
+                          Модель соберёт вопросы интервьюера, отметит трудные темы и составит план, что подтянуть. Запрос оплачивается через API
+                          провайдера.
+                      </p>`
             }
             ${this.debriefError ? html`<p class="debrief-error" role="alert">${this.debriefError}</p>` : ''}
         </div>`;
@@ -536,6 +541,23 @@ export class HistoryView extends LitElement {
                             </ul>
                             ${!this.review?.[key]?.length ? html`<p>Недостаточно данных для вывода.</p>` : ''}`
                 )}`;
+        if (this.activeTab === 'transcript') {
+            const transcript = this.selectedSession.transcript || [];
+            return html`<p>Текст с момента включения сохранения. Аудиозапись не хранится. Удаляется вместе с сессией.</p>
+                ${this.selectedSession.transcriptError ? html`<p role="alert">${this.selectedSession.transcriptError}</p>` : ''}
+                ${!transcript.length ? html`<p>Расшифровка не сохранена. Включите её сохранение во время следующей сессии.</p>` : ''}
+                ${transcript.map(
+                    line =>
+                        html`<div class="message-row user">
+                            <div class="message">
+                                <div class="message-meta">
+                                    ${line.channel === 'mic' ? 'Микрофон' : 'Собеседник (системный звук)'} · ${this.formatTime(line.at)}
+                                </div>
+                                <div class="message-body">${line.text}</div>
+                            </div>
+                        </div>`
+                )}`;
+        }
         if (this.activeTab === 'conversation') {
             const messages = this.collectConversation(this.selectedSession);
             if (!messages.length) return html`<div class="empty">No conversation data.</div>`;
@@ -674,6 +696,14 @@ export class HistoryView extends LitElement {
                 >
             </div>
             <div class="tab-row">
+                <button
+                    class="tab-btn ${this.activeTab === 'transcript' ? 'active' : ''}"
+                    @click=${() => {
+                        this.activeTab = 'transcript';
+                    }}
+                >
+                    Расшифровка (${this.selectedSession.transcript?.length || 0})
+                </button>
                 <button
                     class="tab-btn ${this.activeTab === 'review' ? 'active' : ''}"
                     @click=${() => {

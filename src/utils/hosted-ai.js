@@ -1,5 +1,5 @@
 const { QuestionInbox, relevantMaterials, responseInstructions } = require('./interview-workflow');
-// OpenAI-compatible sessions. One ordered queue owns transcription, chat and images.
+// Transcription stays ordered on its own lane while answer generation continues independently.
 const { randomUUID } = require('crypto');
 
 const PROVIDERS = Object.freeze({
@@ -85,8 +85,9 @@ function wavFrom24k(pcm) {
 }
 
 class SpeechSegmenter {
-    constructor(onSpeech) {
+    constructor(onSpeech, { now = Date.now } = {}) {
         this.onSpeech = onSpeech;
+        this.now = now;
         this.reset();
     }
     reset() {
@@ -99,10 +100,12 @@ class SpeechSegmenter {
     }
     push(pcm) {
         this.pending = Buffer.concat([this.pending, pcm]);
+        const receivedAt = this.now();
         // Fixed 20 ms frames make VAD independent of native/browser chunk sizes.
         while (this.pending.length >= 960) {
             const frame = Buffer.from(this.pending.subarray(0, 960));
             this.pending = this.pending.subarray(960);
+            const frameAt = receivedAt - this.pending.length / 48 - 20;
             let energy = 0;
             for (let i = 0; i < 960; i += 2) energy += (frame.readInt16LE(i) / 32768) ** 2;
             const voice = Math.sqrt(energy / 480) > 0.012;
@@ -113,6 +116,7 @@ class SpeechSegmenter {
                 if (this.voiceFrames < 3) continue;
                 this.speaking = true;
                 this.frames = this.preRoll;
+                this.startAt = frameAt - (this.frames.length - 1) * 20;
                 this.preRoll = [];
             } else {
                 this.frames.push(frame);
@@ -121,13 +125,14 @@ class SpeechSegmenter {
             this.silenceFrames = voice ? 0 : this.silenceFrames + 1;
             if (this.silenceFrames >= 40 || this.frames.length >= 1000) {
                 const frames = this.frames;
+                const timing = { startAt: this.startAt, endAt: frameAt + 20 - this.silenceFrames * 20 };
                 const enoughSpeech = this.voiceFrames >= 10;
                 this.frames = [];
                 this.preRoll = [];
                 this.speaking = false;
                 this.voiceFrames = 0;
                 this.silenceFrames = 0;
-                if (enoughSpeech) this.onSpeech(Buffer.concat(frames));
+                if (enoughSpeech) this.onSpeech(Buffer.concat(frames), timing);
             }
         }
     }
@@ -150,6 +155,7 @@ class HostedSession {
         fetchImpl = fetch,
         reviewAudio = false,
         preparation = null,
+        saveTranscript = () => {},
     }) {
         const config = PROVIDERS[provider];
         if (!config) throw new Error('Unknown provider');
@@ -173,12 +179,18 @@ class HostedSession {
         this.language = language;
         this.emit = emit;
         this.save = save;
-        this.fetch = fetchImpl;
+        this.fetch = (...args) => fetchImpl(...args);
         this.reviewAudio = reviewAudio;
         this.preparation = preparation;
+        this.saveTranscript = saveTranscript;
+        this.recordTranscript = false;
         this.questions = new QuestionInbox(emit);
         this.history = [];
         this.queue = [];
+        this.audioQueue = [];
+        this.audioRunning = false;
+        this.audioController = null;
+        this.audioGeneration = 0;
         this.running = false;
         this.closed = false;
         this.paused = false;
@@ -186,8 +198,8 @@ class HostedSession {
         this.segmenters = new Map(
             ['system', 'mic'].map(channel => [
                 channel,
-                new SpeechSegmenter(pcm => {
-                    this.enqueue({ pcm, channel });
+                new SpeechSegmenter((pcm, timing) => {
+                    this.enqueue({ pcm, channel, ...timing });
                 }),
             ])
         );
@@ -195,18 +207,101 @@ class HostedSession {
     setPaused(paused) {
         this.paused = paused;
         if (paused) {
+            this.audioGeneration++;
+            this.audioController?.abort();
+            for (const job of this.audioQueue.splice(0)) job.resolve({ success: false, error: 'Audio paused' });
             const removed = this.queue.filter(job => job.pcm);
             this.queue = this.queue.filter(job => !job.pcm);
             removed.forEach(job => job.resolve({ success: false, error: 'Audio paused' }));
         }
         for (const segmenter of this.segmenters.values()) segmenter.reset();
+        this.publishAudioState();
     }
     audio(pcm, channel = 'system') {
         if (!this.paused && !this.closed) this.segmenters.get(channel)?.push(pcm);
+        this.publishAudioState();
+    }
+    publishAudioState() {
+        if (this.closed) return;
+        const state = {
+            speaking: !this.paused && !!this.segmenters.get('system')?.speaking,
+            pending: this.audioQueue.filter(job => job.channel !== 'mic').length + (this.activeAudio?.channel !== 'mic' && this.activeAudio ? 1 : 0),
+        };
+        const signature = JSON.stringify(state);
+        if (signature !== this.lastAudioState) {
+            this.lastAudioState = signature;
+            this.emit('audio-progress', state);
+        }
+    }
+    async drainAudio() {
+        if (this.audioRunning) return;
+        this.audioRunning = true;
+        try {
+            while (!this.closed && this.audioQueue.length) {
+                const job = this.audioQueue.shift();
+                this.activeAudio = job;
+                const generation = this.audioGeneration;
+                const controller = new AbortController();
+                this.audioController = controller;
+                this.publishAudioState();
+                try {
+                    const text = await this.transcribe(job.pcm, controller);
+                    if (this.closed || this.paused || generation !== this.audioGeneration) {
+                        job.resolve({ success: false, error: 'Audio paused or session closed' });
+                        continue;
+                    }
+                    if (text) {
+                        const line = { id: job.id, text, channel: job.channel || 'system', at: job.endAt, startAt: job.startAt, endAt: job.endAt };
+                        this.emit('transcript-line', line);
+                        if (job.recordTranscript && this.recordTranscript) {
+                            try {
+                                await this.saveTranscript(line);
+                            } catch (error) {
+                                this.recordTranscript = false;
+                                this.emit('transcript-recording', { enabled: false, error: 'Не удалось сохранить расшифровку: ' + error.message });
+                            }
+                        }
+                        if (!this.closed && !this.paused && generation === this.audioGeneration && job.channel !== 'mic')
+                            this.questions.add(text, job.channel, job);
+                    }
+                    job.resolve({ success: true, draft: true });
+                } catch (error) {
+                    if (!this.closed && !this.paused && generation === this.audioGeneration)
+                        this.emit('audio-error', 'Не удалось распознать реплику. Попросите повторить вопрос или введите его: ' + error.message);
+                    job.resolve({ success: false, error: error.message });
+                } finally {
+                    this.activeAudio = null;
+                    this.audioController = null;
+                    this.publishAudioState();
+                }
+            }
+        } finally {
+            this.audioRunning = false;
+        }
     }
     enqueue(job) {
         if (this.closed) return Promise.resolve({ success: false, error: 'Session closed' });
         if (this.paused && job.pcm) return Promise.resolve({ success: false, error: 'Audio paused' });
+        if (job.pcm && this.reviewAudio) {
+            if (this.audioQueue.length >= 32) {
+                this.emit('audio-error', 'Очередь распознавания заполнена: реплика пропущена. Приостановите запись.');
+                return Promise.resolve({ success: false, error: 'Audio queue full' });
+            }
+            const endAt = Number.isFinite(job.endAt) ? job.endAt : Date.now();
+            const startAt = Number.isFinite(job.startAt) ? job.startAt : endAt - job.pcm.length / 48;
+            return new Promise(resolve => {
+                this.audioQueue.push({
+                    ...job,
+                    recordTranscript: this.recordTranscript,
+                    id: randomUUID(),
+                    startAt,
+                    endAt,
+                    resolve,
+                });
+                this.drainAudio();
+                this.publishAudioState();
+            });
+        }
         if (this.queue.length >= 32) {
             this.emit('update-status', 'Queue full — pause and let pending questions finish');
             return Promise.resolve({ success: false, error: 'Question queue full' });
@@ -219,13 +314,13 @@ class HostedSession {
             this.drain();
         });
     }
-    async request(path, init) {
-        const timeout = setTimeout(() => this.controller?.abort(), 90000);
+    async request(path, init, controller = this.controller) {
+        const timeout = setTimeout(() => controller?.abort(), 90000);
         try {
             const response = await this.fetch(`${this.config.baseUrl}${path}`, {
                 ...init,
                 method: 'POST',
-                signal: this.controller.signal,
+                signal: controller?.signal,
                 headers: { Authorization: `Bearer ${this.key}`, ...init.headers },
             });
             if (!response.ok) {
@@ -239,10 +334,10 @@ class HostedSession {
             throw error;
         }
     }
-    async transcribe(pcm) {
-        return this.transcribeFile(wavFrom24k(pcm), 'wav');
+    async transcribe(pcm, controller = this.controller) {
+        return this.transcribeFile(wavFrom24k(pcm), 'wav', controller);
     }
-    async transcribeFile(audio, format) {
+    async transcribeFile(audio, format, controller = this.controller) {
         const language = this.language?.split('-')[0];
         let init;
         if (this.provider === 'openrouter') {
@@ -263,7 +358,7 @@ class HostedSession {
             if (language) form.append('language', language);
             init = { body: form };
         }
-        const { response, cleanup } = await this.request('/audio/transcriptions', init);
+        const { response, cleanup } = await this.request('/audio/transcriptions', init, controller);
         try {
             const payload = await response.json();
             if (typeof payload.text !== 'string') throw new Error('Invalid transcription response');
@@ -409,6 +504,8 @@ class HostedSession {
         this.closed = true;
         this.questions.clear();
         this.controller?.abort();
+        this.audioController?.abort();
+        for (const job of this.audioQueue.splice(0)) job.resolve({ success: false, error: 'Session closed' });
         for (const segmenter of this.segmenters.values()) segmenter.reset();
         for (const job of this.queue.splice(0)) job.resolve({ success: false, error: 'Session closed' });
         this.history = [];

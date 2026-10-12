@@ -15,6 +15,12 @@ export class InterviewTools extends LitElement {
         revision: { state: true },
         status: { state: true },
         busy: { state: true },
+        autoAnswers: { state: true },
+        paused: { type: Boolean },
+        audioProgress: { state: true },
+        audioError: { state: true },
+        recordTranscript: { state: true },
+        splitSegment: { state: true },
         workspace: { state: true },
         mode: { state: true },
         routing: { state: true },
@@ -352,7 +358,12 @@ export class InterviewTools extends LitElement {
             border-color: var(--accent);
         }
     `;
-    updated() {
+    updated(changed) {
+        if (this.autoQueue && (changed.has('paused') || changed.has('busy'))) {
+            this.autoQueue.paused = this.paused;
+            this.autoQueue.blocked = this.busy;
+            this.autoQueue.update(this.inbox);
+        }
         this.toggleAttribute('design-active', !this.preparationOnly && this.tab === 'design' && !this.collapsed);
     }
     constructor() {
@@ -368,6 +379,13 @@ export class InterviewTools extends LitElement {
         this.revision = 0;
         this.status = '';
         this.busy = false;
+        this.autoAnswers = false;
+        this.paused = false;
+        this.audioProgress = { speaking: false, pending: 0 };
+        this.audioError = '';
+        this.recordTranscript = false;
+        this.splitSegment = 1;
+        this.manualDraftIds = new Set();
         this.workspace = { packages: [], activePackageId: '', design: {}, designVersions: [] };
         this.mode = 'answer';
         this.routing = 'auto';
@@ -394,12 +412,35 @@ export class InterviewTools extends LitElement {
     }
     connectedCallback() {
         super.connectedCallback();
+        const { AutoAnswerQueue } = window.require('./utils/interview-workflow');
+        this.autoQueue = new AutoAnswerQueue(async q => {
+            const current = this.inbox.find(item => item.id === q.id);
+            if (!current || current.revision !== q.revision || !this.autoAnswers || this.paused) return;
+            // A locally edited draft always waits for manual approval.
+            if (this.manualDraftIds.has(q.id) || (q.id === this.questionId && this.questionText !== q.text)) return;
+            const success = await this.perform(async () => {
+                this.status = '';
+                await this.ask(q.text, { questionId: q.id, revision: q.revision, routing: 'auto' });
+                this.status = '';
+            });
+            if (!success) {
+                this.autoAnswers = false;
+
+                this.status += ' Автоответы выключены. Можно повторить запрос вручную.';
+                throw Error(this.status);
+            }
+        });
         this.onInbox = (_, items) => {
             const old = this.inbox.find(q => q.id === this.questionId);
             this.inbox = items;
             const next = items.find(q => q.id === this.questionId);
+            if (!next) {
+                this.questionId = '';
+                this.questionText = '';
+            }
             if (old && next && this.questionText === old.text && this.revision === old.revision) this.selectQuestion(next);
             if (!this.questionId && items.length) this.selectQuestion(items[0]);
+            this.autoQueue.update(items);
         };
         this.onPaste = event => {
             const images = [...(event.clipboardData?.items || [])].filter(i => i.type.startsWith('image/'));
@@ -410,17 +451,39 @@ export class InterviewTools extends LitElement {
         };
         this.addEventListener('paste', this.onPaste);
         this.ipc.on('question-inbox', this.onInbox);
+        this.onAudio = (_, progress) => {
+            this.audioProgress = progress;
+            this.autoQueue.waitingForSpeech = progress.speaking || progress.pending > 0;
+            this.autoQueue.update(this.inbox);
+        };
+        this.onAudioError = (_, message) => {
+            this.audioError = message;
+            this.autoAnswers = false;
+            this.autoQueue.setEnabled(false);
+        };
+        this.onRecording = (_, value) => {
+            this.recordTranscript = value.enabled;
+            if (value.error) this.audioError = value.error;
+        };
+        this.ipc.on('audio-progress', this.onAudio);
+        this.ipc.on('audio-error', this.onAudioError);
+        this.ipc.on('transcript-recording', this.onRecording);
         this.load();
     }
     disconnectedCallback() {
         super.disconnectedCallback();
+        this.autoQueue?.close();
         this.ipc.removeListener('question-inbox', this.onInbox);
+        this.ipc.removeListener('audio-progress', this.onAudio);
+        this.ipc.removeListener('audio-error', this.onAudioError);
+        this.ipc.removeListener('transcript-recording', this.onRecording);
         this.removeEventListener('paste', this.onPaste);
     }
     async load() {
         try {
             this.workspace = (await this.call('workspace-load')).data;
             this.inbox = (await this.call('questions')).data;
+            this.autoQueue.update(this.inbox);
             if (this.inbox.length) this.selectQuestion(this.inbox[0]);
             this._loaded = true;
             if (this.owner._restoredTools) {
@@ -434,6 +497,10 @@ export class InterviewTools extends LitElement {
     async perform(fn) {
         if (this.busy) return;
         this.busy = true;
+        if (this.autoQueue) {
+            this.autoQueue.blocked = true;
+            this.autoQueue.update(this.inbox);
+        }
         this.status = 'Выполняется…';
         try {
             await fn();
@@ -443,6 +510,10 @@ export class InterviewTools extends LitElement {
             return false;
         } finally {
             this.busy = false;
+            if (this.autoQueue) {
+                this.autoQueue.blocked = false;
+                this.autoQueue.update(this.inbox);
+            }
         }
     }
     async persist() {
@@ -459,10 +530,49 @@ export class InterviewTools extends LitElement {
             this.workspace = { ...this.workspace };
         }
     }
+    toggleAutoAnswers() {
+        this.autoAnswers = !this.autoAnswers;
+        if (this.autoAnswers) this.audioError = '';
+        this.autoQueue.paused = this.paused;
+        this.autoQueue.setEnabled(this.autoAnswers);
+    }
+    get listeningHint() {
+        if (this.audioError) return this.audioError;
+        if (this.paused) return 'Аудио на паузе. Можно ответить вручную.';
+        if (this.audioProgress.speaking) return 'Слышу собеседника — жду конец вопроса';
+        if (this.audioProgress.pending) return `Распознаю речь · в очереди ${this.audioProgress.pending}`;
+        if (!this.autoAnswers) return 'Выберите вопрос и нажмите «Ответить сейчас»';
+        if (this.busy) return 'Готовлю ответ. Запись речи продолжается.';
+        return 'Автоответ после завершения вопроса. Неоднозначные реплики отправьте вручную.';
+    }
+    async toggleTranscript() {
+        try {
+            this.recordTranscript = (await this.call('record-transcript', { enabled: !this.recordTranscript })).enabled;
+        } catch (error) {
+            this.status = error.message;
+        }
+    }
+    async editQuestionGroup(action) {
+        this.autoAnswers = false;
+        this.autoQueue.setEnabled(false);
+        const selected = this.inbox.find(q => q.id === this.questionId);
+        const next = this.inbox[this.inbox.indexOf(selected) + 1];
+        const success = await this.perform(() =>
+            this.call(action, {
+                id: this.questionId,
+                revision: this.revision,
+                segmentIndex: Number(this.splitSegment),
+                nextId: next?.id,
+                nextRevision: next?.revision,
+            })
+        );
+        if (success) this.status = 'Проверьте вопросы после изменения. Автоответы выключены.';
+    }
     selectQuestion(q) {
         this.questionId = q.id;
         this.questionText = q.text;
         this.revision = q.revision;
+        this.splitSegment = 1;
     }
     restoreDraft(snapshot) {
         if (snapshot.toolState)
@@ -471,6 +581,7 @@ export class InterviewTools extends LitElement {
         this.questionId = snapshot.questionId;
         this.questionText = snapshot.questionText;
         this.revision = snapshot.questionRevision;
+        if (this.questionId && this.questionText !== this.inbox.find(q => q.id === this.questionId)?.text) this.manualDraftIds.add(this.questionId);
         this.notifyAttachments();
     }
     async retry(requestId) {
@@ -849,6 +960,12 @@ export class InterviewTools extends LitElement {
         return html` ${
             !this.preparationOnly
                 ? html`<div class="bar">
+                      <button aria-pressed=${this.autoAnswers} @click=${() => this.toggleAutoAnswers()}>
+                          Автоответы: ${this.autoAnswers ? 'вкл' : 'выкл'}
+                      </button>
+                      <label title="Только текст с момента включения. Хранится локально до удаления сессии.">
+                          <input type="checkbox" .checked=${this.recordTranscript} @change=${() => this.toggleTranscript()} /> Сохранять расшифровку
+                      </label>
                       ${[
                           ['questions', 'Вопросы ' + this.inbox.length],
                           ['topics', 'Темы'],
@@ -926,6 +1043,23 @@ export class InterviewTools extends LitElement {
                 : ''
         }
         ${
+            !this.preparationOnly
+                ? html`<div class="bar" role="status">
+                      ${this.listeningHint}${
+                          this.audioError
+                              ? html`<button
+                                    @click=${() => {
+                                        this.audioError = '';
+                                    }}
+                                >
+                                    Понятно
+                                </button>`
+                              : ''
+                      }
+                  </div>`
+                : ''
+        }
+        ${
             (!this.collapsed && this.tab && (this.tab !== 'questions' || selected)) || this.preparationOnly
                 ? html`<div class="panel">
                       ${this.preparationOnly || this.tab === 'prep' ? this.renderPreparation() : ''}
@@ -933,12 +1067,43 @@ export class InterviewTools extends LitElement {
                           !this.preparationOnly && this.tab === 'questions'
                               ? html`${this.inbox.map(q => html`<button class=${q.id === this.questionId ? 'active' : ''} @click=${() => this.selectQuestion(q)}>${q.text.slice(0, 85)}</button>`)}${
                                     selected
-                                        ? html`<textarea .value=${this.questionText} @input=${e => (this.questionText = e.target.value)}></textarea
+                                        ? html`<div class="bar">
+                                                  <button
+                                                      ?disabled=${this.busy || this.questionText !== selected.text || selected.revision !== this.revision || this.inbox.indexOf(selected) === this.inbox.length - 1}
+                                                      @click=${() => this.editQuestionGroup('merge-questions')}
+                                                  >
+                                                      Объединить со следующим
+                                                  </button>
+                                                  ${
+                                                      (selected?.segments?.length || 0) > 1
+                                                          ? html` <select
+                                                                    aria-label="Разделить перед репликой"
+                                                                    .value=${String(this.splitSegment)}
+                                                                    @change=${e => (this.splitSegment = Number(e.target.value))}
+                                                                >
+                                                                    ${selected.segments.slice(1).map((segment, i) => html`<option value=${i + 1}>${segment.text.slice(0, 80)}</option>`)}
+                                                                </select>
+                                                                <button
+                                                                    ?disabled=${this.busy || this.questionText !== selected.text || selected.revision !== this.revision}
+                                                                    @click=${() => this.editQuestionGroup('split-question')}
+                                                                >
+                                                                    Разделить
+                                                                </button>`
+                                                          : ''
+                                                  }
+                                              </div>
+                                              <textarea
+                                                  .value=${this.questionText}
+                                                  @input=${e => {
+                                                      this.questionText = e.target.value;
+                                                      if (this.questionId) this.manualDraftIds.add(this.questionId);
+                                                  }}
+                                              ></textarea
                                               >${selected.revision !== this.revision ? html`<button @click=${() => this.selectQuestion(selected)}>Получено дополнение — загрузить новую версию</button>` : ''}<button
                                                   ?disabled=${this.busy || selected.revision !== this.revision}
                                                   @click=${this.sendQuestion}
                                               >
-                                                  Ответить на вопрос</button
+                                                  Ответить сейчас</button
                                               ><button
                                                   ?disabled=${this.busy}
                                                   @click=${() =>
