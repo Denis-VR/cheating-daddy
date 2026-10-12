@@ -628,7 +628,10 @@ export class CheatingDaddyApp extends LitElement {
             });
             ipcRenderer.on('transcript-line', (_, line) => {
                 if (!line || typeof line.text !== 'string' || !line.text.trim()) return;
-                this.transcriptLines = [...this.transcriptLines.slice(-2), { text: line.text.trim().slice(0, 600), channel: line.channel, at: line.at }];
+                this.transcriptLines = [
+                    ...this.transcriptLines.slice(-11),
+                    { text: line.text.trim().slice(0, 600), channel: line.channel, at: line.at },
+                ];
             });
             ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
             ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));

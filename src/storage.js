@@ -483,8 +483,23 @@ function saveSession(sessionId, data) {
     return writeJsonFile(sessionPath, sessionData);
 }
 
+function appendTranscript(sessionId, line) {
+    getSessionPath(sessionId);
+    if (!fs.existsSync(getSessionPath(sessionId))) throw Error('Сессия не найдена');
+    new (require('./utils/transcript-journal').TranscriptJournal)(getHistoryDir()).append(sessionId, line);
+}
+
 function getSession(sessionId) {
-    return readJsonFile(getSessionPath(sessionId), null);
+    const session = readJsonFile(getSessionPath(sessionId), null);
+    if (session) {
+        try {
+            session.transcript = new (require('./utils/transcript-journal').TranscriptJournal)(getHistoryDir()).read(sessionId);
+        } catch (error) {
+            session.transcript = [];
+            session.transcriptError = 'Не удалось прочитать расшифровку: ' + error.message;
+        }
+    }
+    return session;
 }
 
 function getAllSessions() {
@@ -532,6 +547,7 @@ function getAllSessions() {
 function deleteSession(sessionId) {
     const sessionPath = getSessionPath(sessionId);
     try {
+        new (require('./utils/transcript-journal').TranscriptJournal)(getHistoryDir()).remove(sessionId);
         if (fs.existsSync(sessionPath)) {
             fs.unlinkSync(sessionPath);
             return true;
@@ -546,7 +562,7 @@ function deleteAllSessions() {
     const historyDir = getHistoryDir();
     try {
         if (fs.existsSync(historyDir)) {
-            const files = fs.readdirSync(historyDir).filter(f => f.endsWith('.json'));
+            const files = fs.readdirSync(historyDir).filter(f => f.endsWith('.json') || f.endsWith('.transcript.jsonl'));
             files.forEach(file => {
                 fs.unlinkSync(path.join(historyDir, file));
             });
@@ -603,6 +619,7 @@ module.exports = {
 
     // History
     saveSession,
+    appendTranscript,
     getSession,
     getAllSessions,
     deleteSession,

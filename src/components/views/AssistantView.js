@@ -296,6 +296,17 @@ export class AssistantView extends LitElement {
             border-color: var(--success);
         }
 
+        .answer-example {
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin: 12px 0;
+        }
+        .answer-example > p:first-child {
+            font-weight: 600;
+            margin: 0 0 8px;
+        }
         /* ── Live transcript ── */
 
         .transcript {
@@ -724,6 +735,18 @@ export class AssistantView extends LitElement {
                 node = next;
             }
             heading.remove();
+            // Tables and code are reference material: they should not disappear inside optional prose.
+            const examples = [...details.querySelectorAll('table, pre')];
+            if (examples.length) {
+                const card = doc.createElement('section');
+                card.className = 'answer-example';
+                card.setAttribute('aria-label', 'Наглядный пример');
+                const label = doc.createElement('p');
+                label.textContent = 'Наглядный пример';
+                card.appendChild(label);
+                examples.forEach(example => card.appendChild(example));
+                details.before(card);
+            }
         }
         const tagsToSkip = ['PRE'];
 
@@ -1336,6 +1359,7 @@ export class AssistantView extends LitElement {
             ${
                 this.hostedMode
                     ? html`<interview-tools
+                          .paused=${this.paused}
                           style=${this.focusMode ? 'display:none' : ''}
                           @font-step=${e => this.changeFontSize(e.detail)}
                           @focus-toggle=${() => {
@@ -1364,18 +1388,38 @@ export class AssistantView extends LitElement {
                                   >
                                       ${this.teleprompterOn ? '❚❚ Суфлёр' : '▶ Суфлёр'}
                                   </button>
-                                  <button class="nav-text-btn" title="Медленнее" aria-label="Медленнее" @click=${() => this.changeTeleprompterSpeed(-1)}>−</button>
+                                  <button
+                                      class="nav-text-btn"
+                                      title="Медленнее"
+                                      aria-label="Медленнее"
+                                      @click=${() => this.changeTeleprompterSpeed(-1)}
+                                  >
+                                      −
+                                  </button>
                                   <span class="tp-speed" title="Скорость, пикселей в секунду">${this.teleprompterSpeed}</span>
-                                  <button class="nav-text-btn" title="Быстрее" aria-label="Быстрее" @click=${() => this.changeTeleprompterSpeed(1)}>+</button>
+                                  <button class="nav-text-btn" title="Быстрее" aria-label="Быстрее" @click=${() => this.changeTeleprompterSpeed(1)}>
+                                      +
+                                  </button>
                                   ${
                                       !this.showTranscript && this.transcript?.length
-                                          ? html`<button class="nav-text-btn" title="Показать ленту речи" @click=${() => this.setShowTranscript(true)}>Речь</button>`
+                                          ? html`<button
+                                                class="nav-text-btn"
+                                                title="Показать ленту речи"
+                                                @click=${() => this.setShowTranscript(true)}
+                                            >
+                                                Речь
+                                            </button>`
                                           : ''
                                   }
                               </div>
                               ${
                                   hasMultipleResponses
-                                      ? html`<button class="nav-btn" @click=${this.navigateToPreviousResponse} ?disabled=${position <= 0} title="Previous response">
+                                      ? html`<button
+                                                class="nav-btn"
+                                                @click=${this.navigateToPreviousResponse}
+                                                ?disabled=${position <= 0}
+                                                title="Previous response"
+                                            >
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                                     <path
                                                         fill-rule="evenodd"
@@ -1401,7 +1445,11 @@ export class AssistantView extends LitElement {
                                             </button>`
                                       : ''
                               }
-                              <button class="copy-answer ${this.answerCopied ? 'copied' : ''}" title="Копировать ответ" @click=${this.copyCurrentAnswer}>
+                              <button
+                                  class="copy-answer ${this.answerCopied ? 'copied' : ''}"
+                                  title="Копировать ответ"
+                                  @click=${this.copyCurrentAnswer}
+                              >
                                   ${this.answerCopied ? 'Скопировано' : 'Копировать ответ'}
                               </button>
                           </div>
