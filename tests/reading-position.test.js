@@ -674,3 +674,35 @@ test('streaming preserves user section expansion but a new answer starts collaps
         [false, false]
     );
 });
+
+test('mic speech after the last request feeds "what did I miss"; silence explains what is needed', async () => {
+    const a = app();
+    a.micLines = [];
+    a.topicMeta = [];
+    a.addNewResponse('answer');
+    a.currentResponseIndex = 0;
+    a.beginInterviewRequest('question', 'current');
+    a._lastRequestAt -= 10;
+    a.micLines.push({ text: 'старое', at: a._lastRequestAt - 1 }, { text: 'процесс изолирован', at: Date.now() });
+    assert.equal(a.spokenSinceLastRequest(), 'процесс изолирован');
+
+    const calls = [];
+    const tools = { busy: false, status: '', perform: async fn => fn(), ask: async (text, options) => calls.push({ text, ...options }) };
+    const owner = { spokenSinceLastRequest: () => '' };
+    const View = loadClass('src/components/views/AssistantView.js', 'AssistantView', { window: { cheatingDaddy: { element: () => owner } } });
+    const view = Object.assign(Object.create(View.prototype), {
+        responses: ['answer'],
+        currentResponseIndex: 0,
+        isAnalyzing: false,
+        shadowRoot: { querySelector: () => tools },
+    });
+    await view.runAnswerView('missed');
+    assert.equal(calls.length, 0);
+    assert.match(tools.status, /микрофон/);
+    owner.spokenSinceLastRequest = () => 'процесс изолирован';
+    await view.runAnswerView('missed');
+    assert.equal(calls[0].mode, 'missed');
+    assert.match(calls[0].text, /процесс изолирован/);
+    await view.runAnswerView('table');
+    assert.equal(calls[1].mode, 'table');
+});

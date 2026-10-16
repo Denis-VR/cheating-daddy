@@ -18,8 +18,14 @@ const DEFAULT_QUICK_ACTIONS = [
     },
 ];
 
-const INLINE_QUICK_ACTIONS = 3;
-const TABLE_ACTION = { label: 'Таблица', prompt: 'Сведи этот ответ в таблицу-шпаргалку' };
+const INLINE_QUICK_ACTIONS = 2;
+// Built-in follow-ups that use their own answer modes; the base answer stays short and these load only on demand.
+const ANSWER_VIEWS = [
+    { label: '▦ Таблица', prompt: 'Сведи этот ответ в таблицу-шпаргалку', mode: 'table', title: 'Ответ таблицей-шпаргалкой' },
+    { label: 'Объяснить', prompt: 'Объясни этот ответ простыми словами', mode: 'explain', title: 'Суть и почему это так, простыми словами' },
+    { label: 'Детали', prompt: 'Углубись в детали этого ответа', mode: 'deep', title: 'Внутреннее устройство, нюансы и вероятные доп. вопросы' },
+    { label: 'Что упустил', prompt: '', mode: 'missed', title: 'Сравнить сказанное в микрофон с ответом на экране' },
+];
 
 const TELEPROMPTER_SPEED = { min: 10, max: 200, step: 10 };
 
@@ -541,6 +547,10 @@ export class AssistantView extends LitElement {
             font-family: var(--font);
             padding: 6px 10px;
         }
+        .quick-followups .analyze-btn.practice {
+            border-color: var(--success, #3fb950);
+            background: rgba(63, 185, 80, 0.14);
+        }
         .quick-followups .analyze-btn.primary {
             border-color: var(--accent);
             background: rgba(59, 130, 246, 0.16);
@@ -555,7 +565,7 @@ export class AssistantView extends LitElement {
             display: flex;
             align-items: center;
             gap: var(--space-sm);
-            padding: var(--space-md);
+            padding: 2px var(--space-sm) var(--space-sm);
             background: var(--bg-app);
         }
 
@@ -675,6 +685,7 @@ export class AssistantView extends LitElement {
         transcript: { type: Array },
         showTranscript: { state: true },
         actionsExpanded: { state: true },
+        practice: { state: true },
         teleprompterOn: { state: true },
         teleprompterSpeed: { state: true },
     };
@@ -693,6 +704,7 @@ export class AssistantView extends LitElement {
         this.transcript = [];
         this.showTranscript = true;
         this.actionsExpanded = false;
+        this.practice = false;
         this.teleprompterOn = false;
         this.teleprompterSpeed = 30;
     }
@@ -910,6 +922,8 @@ export class AssistantView extends LitElement {
             ipcRenderer.on('response-font-step', this.handleFontStep);
             this.handleTeleprompterToggle = () => this.toggleTeleprompter();
             ipcRenderer.on('toggle-teleprompter', this.handleTeleprompterToggle);
+            this.handleAnswerView = (_event, mode) => this.runAnswerView(mode);
+            ipcRenderer.on('answer-view', this.handleAnswerView);
 
             ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
             ipcRenderer.on('navigate-next-response', this.handleNextResponse);
@@ -931,6 +945,7 @@ export class AssistantView extends LitElement {
             if (this.handleScrollDown) ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
             if (this.handleFontStep) ipcRenderer.removeListener('response-font-step', this.handleFontStep);
             if (this.handleTeleprompterToggle) ipcRenderer.removeListener('toggle-teleprompter', this.handleTeleprompterToggle);
+            if (this.handleAnswerView) ipcRenderer.removeListener('answer-view', this.handleAnswerView);
         }
     }
 
@@ -1370,6 +1385,46 @@ export class AssistantView extends LitElement {
         }
     }
 
+    async runAnswerView(mode) {
+        const view = ANSWER_VIEWS.find(v => v.mode === mode);
+        if (!view || this.currentResponseIndex < 0 || !this.getCurrentResponse()?.trim()) return;
+        if (mode !== 'missed') return this.handleQuickFollowup(view.prompt, { mode });
+        const spoken = window.cheatingDaddy.element().spokenSinceLastRequest?.() || '';
+        if (!spoken) {
+            const tools = this.shadowRoot.querySelector('interview-tools');
+            if (tools) tools.status = 'Не слышу вашего ответа. Выберите источник звука «Звук компьютера + микрофон» и ответьте вслух.';
+            return;
+        }
+        return this.handleQuickFollowup(`Что я сказал вслух:\n${spoken}`, { mode });
+    }
+
+    async askPracticeQuestion() {
+        const tools = this.shadowRoot.querySelector('interview-tools');
+        if (this.isAnalyzing || !tools || tools.busy) return;
+        this.isAnalyzing = true;
+        try {
+            await tools.perform(async () => {
+                await tools.ask('Задай мне следующий вопрос', { mode: 'practice', routing: 'new' });
+                tools.status = 'Ответьте вслух или напишите ответ, затем нажмите «Оценить ответ».';
+            });
+        } finally {
+            this.isAnalyzing = false;
+        }
+    }
+
+    async evaluatePracticeAnswer() {
+        const input = this.shadowRoot.querySelector('#textInput');
+        const typed = input?.value.trim() || '';
+        const answer = typed || window.cheatingDaddy.element().spokenSinceLastRequest?.() || '';
+        const tools = this.shadowRoot.querySelector('interview-tools');
+        if (!answer) {
+            if (tools) tools.status = 'Ответьте вслух (нужен микрофон) или напишите ответ в поле ввода.';
+            return;
+        }
+        if (typed) input.value = '';
+        await this.handleQuickFollowup(`Мой ответ:\n${answer.slice(0, 8000)}`, { mode: 'evaluate' });
+    }
+
     renderQuickActions() {
         const disabled = this.isAnalyzing || this.currentResponseIndex < 0 || !this.getCurrentResponse()?.trim();
         const button = action =>
@@ -1378,14 +1433,31 @@ export class AssistantView extends LitElement {
             </button>`;
         const shown = this.actionsExpanded ? this.quickActions : this.quickActions.slice(0, INLINE_QUICK_ACTIONS);
         return html`<div class="quick-followups ${this.actionsExpanded ? 'expanded' : ''}" role="group" aria-label="Уточнить ответ">
-            <button
-                class="analyze-btn primary"
-                title="Показать ответ таблицей-шпаргалкой"
-                ?disabled=${disabled}
-                @click=${() => this.handleQuickFollowup(TABLE_ACTION.prompt, { mode: 'table' })}
-            >
-                ▦ ${TABLE_ACTION.label}
-            </button>
+            ${this.practice
+                ? html`<button
+                          class="analyze-btn practice"
+                          ?disabled=${this.isAnalyzing}
+                          title="AI задаст следующий вопрос по вакансии"
+                          @click=${this.askPracticeQuestion}
+                      >
+                          🎯 Следующий вопрос
+                      </button>
+                      <button
+                          class="analyze-btn practice"
+                          ?disabled=${disabled}
+                          title="Оценить ваш ответ: голос из микрофона или текст из поля ввода"
+                          @click=${this.evaluatePracticeAnswer}
+                      >
+                          Оценить ответ
+                      </button>
+                      <button class="analyze-btn" title="Выйти из тренировки" @click=${() => (this.practice = false)}>×</button>`
+                : ''}
+            ${ANSWER_VIEWS.map(
+                view =>
+                    html`<button class="analyze-btn primary" title=${view.title} ?disabled=${disabled} @click=${() => this.runAnswerView(view.mode)}>
+                        ${view.label}
+                    </button>`
+            )}
             ${shown.map(button)}
             ${this.actionsExpanded
                 ? html`<button
@@ -1458,6 +1530,10 @@ export class AssistantView extends LitElement {
                       .paused=${this.paused}
                       style=${this.focusMode ? 'display:none' : ''}
                       @font-step=${e => this.changeFontSize(e.detail)}
+                      @practice-toggle=${() => {
+                          this.practice = !this.practice;
+                          if (this.practice) this.askPracticeQuestion();
+                      }}
                       @focus-toggle=${() => {
                           owner.focusMode = !owner.focusMode;
                       }}

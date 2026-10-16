@@ -31,7 +31,12 @@ function selectedPreparation(value = loadWorkspace()) {
         vacancy: vacancy?.text || '',
         experience: '',
         resumeName: resume?.name || '',
-        materials: resume ? [{ name: resume.name, text: resume.text }] : [],
+        materials: resume
+            ? [
+                  { name: resume.name, text: resume.text },
+                  ...(resume.stories ? [{ name: 'STAR-истории (подготовлены заранее)', text: resume.stories }] : []),
+              ]
+            : [],
     };
 }
 function loadWorkspace() {
@@ -75,7 +80,8 @@ function saveWorkspace(value) {
                 !item.name.trim() ||
                 item.name.length > 200 ||
                 typeof item.text !== 'string' ||
-                item.text.length > 600000
+                item.text.length > 600000 ||
+                (item.stories !== undefined && (typeof item.stories !== 'string' || item.stories.length > 60000))
             )
                 throw Error('Некорректный документ');
             ids.add(item.id);

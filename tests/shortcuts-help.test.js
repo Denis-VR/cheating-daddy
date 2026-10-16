@@ -64,7 +64,8 @@ test('shortcut sheet is protected before display, isolated and independent of ma
     assert.equal(blocked, true);
     const html = decodeURIComponent(win.url.split(',').slice(1).join(','));
     assert.match(html, /Cmd\+K/);
-    assert.match(html, /ScreenCaptureKit/);
+    assert.ok(!html.includes('ScreenCaptureKit'));
+    assert.ok(!html.includes('<h1>'));
 });
 
 test('repeat shortcut and Escape close sheet; parent hiding closes it and removes listeners', () => {
@@ -142,8 +143,10 @@ test('answer strip keeps the table button and copy in view, rare actions behind 
     assert.match(flatten(view.render()), /class="tp-speed"/);
     view.quickActions = ['A', 'B', 'C', 'D'].map(label => ({ label, prompt: label }));
     const collapsed = flatten(view.render());
-    assert.match(collapsed, /C\s*<\/button>/);
-    assert.ok(!/D\s*<\/button>/.test(collapsed));
+    assert.match(collapsed, /B\s*<\/button>/);
+    assert.ok(!/C\s*<\/button>/.test(collapsed));
+    assert.match(collapsed, /Объяснить/);
+    assert.match(collapsed, /Детали/);
     view.actionsExpanded = true;
     assert.match(flatten(view.render()), /D\s*<\/button>/);
     assert.deepEqual(view.responses, ['saved answer']);

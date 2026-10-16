@@ -100,7 +100,7 @@ test('text-only benchmark skips image models and uses session instructions and p
     assert.equal(result.length, 1);
     assert.equal(calls.length, 1);
     const system = calls[0].messages[0].content;
-    for (const text of ['PROFILE INSTRUCTION', 'EXTRA INSTRUCTION', 'ru-RU', 'Go developer', 'Объяснить']) assert.ok(system.includes(text), text);
+    for (const text of ['PROFILE INSTRUCTION', 'EXTRA INSTRUCTION', 'ru-RU', 'Go developer', 'say right now']) assert.ok(system.includes(text), text);
 });
 test('benchmark rejects malformed inputs and oversized image arrays', async () => {
     await assert.rejects(benchmarkModels({ provider: 'other', text: 'test' }), /Введите/);

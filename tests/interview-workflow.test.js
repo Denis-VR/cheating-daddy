@@ -127,3 +127,19 @@ test('table mode asks for a compact cheat-sheet table instead of the three spoke
     assert.match(instructions, /Markdown table/);
     assert.ok(!instructions.includes('Сказать сейчас'));
 });
+test('the base answer stays short; explanation and depth are separate on-demand modes', () => {
+    assert.ok(!/Объяснить|Углубиться/.test(responseInstructions('answer')));
+    assert.match(responseInstructions('explain'), /plain words/);
+    assert.match(responseInstructions('deep'), /follow-up questions/);
+    for (const mode of ['explain', 'deep']) assert.equal(validateRequest({ text: 'x', requestId: 'id', mode }).mode, mode);
+});
+test('missed, STAR bank and practice modes ask for their own compact formats', () => {
+    for (const mode of ['missed', 'stars', 'practice', 'evaluate']) {
+        assert.equal(validateRequest({ text: 'x', requestId: 'id', mode }).mode, mode);
+        assert.match(responseInstructions(mode), /Never invent/);
+    }
+    assert.match(responseInstructions('missed'), /at most three/);
+    assert.match(responseInstructions('stars'), /\[уточнить\]/);
+    assert.match(responseInstructions('practice'), /exactly one/);
+    assert.match(responseInstructions('evaluate'), /Оценка: N\/10/);
+});

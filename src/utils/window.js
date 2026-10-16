@@ -133,6 +133,11 @@ function getDefaultKeybinds() {
         increaseOpacity: isMac ? 'Cmd+Alt+Right' : 'Ctrl+Alt+Right',
         toggleTeleprompter: isMac ? 'Cmd+Alt+S' : 'Ctrl+Alt+S',
         shortcutsHelp: isMac ? 'Cmd+K' : 'Ctrl+K',
+        answerLatest: isMac ? 'Cmd+Shift+Enter' : 'Ctrl+Shift+Enter',
+        answerTable: isMac ? 'Cmd+Alt+1' : 'Ctrl+Alt+1',
+        answerExplain: isMac ? 'Cmd+Alt+2' : 'Ctrl+Alt+2',
+        answerDetails: isMac ? 'Cmd+Alt+3' : 'Ctrl+Alt+3',
+        answerMissed: isMac ? 'Cmd+Alt+4' : 'Ctrl+Alt+4',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
@@ -149,6 +154,20 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     }
     if (keybinds.focusMode) globalShortcut.register(keybinds.focusMode, () => sendToRenderer('toggle-focus-mode'));
     globalShortcut.register('CommandOrControl+P', () => sendToRenderer('toggle-session-pause'));
+    for (const [action, channel, value] of [
+        ['answerLatest', 'answer-latest-question'],
+        ['answerTable', 'answer-view', 'table'],
+        ['answerExplain', 'answer-view', 'explain'],
+        ['answerDetails', 'answer-view', 'deep'],
+        ['answerMissed', 'answer-view', 'missed'],
+    ]) {
+        if (!keybinds[action]) continue;
+        try {
+            globalShortcut.register(keybinds[action], () => sendToRenderer(channel, value));
+        } catch (error) {
+            console.error(`Answer shortcut unavailable (${action}):`, error.message);
+        }
+    }
     if (keybinds.toggleTeleprompter) {
         try {
             globalShortcut.register(keybinds.toggleTeleprompter, () => sendToRenderer('toggle-teleprompter'));
